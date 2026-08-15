@@ -173,58 +173,83 @@ export function evaluate(state: DetectorState, nowMs: number): {
 
   const windowStart = nowMs - STATIONARY.observationWindowSeconds * 1000;
   const window = windowSamples(observations, windowStart);
-  const spanSeconds = window.length > 1 ? (latest.ts - window[0]!.ts) / 1000 : 0;
   const allSlow = window.length > 0 && window.every((o) => !isMovingSample(o));
   const displacementOk = maxDisplacement(window) <= STATIONARY.maxDisplacementMeters;
 
-  const confirmed =
-    allSlow &&
-    displacementOk &&
-    (spanSeconds >= STATIONARY.observationWindowSeconds || historySeconds > 0 || stationarySince !== null);
-
-  if (!confirmed) {
-    if (!allSlow || !displacementOk) {
-      stationarySince = null;
-      historySeconds = 0;
-    } else if (stationarySince === null) {
-      // Slow but not yet long enough to confirm; remember the candidate start.
-      stationarySince = window[0]?.ts ?? latest.ts;
-    }
-    const liveSeconds =
-      stationarySince !== null ? Math.max(0, (nowMs - stationarySince) / 1000) : 0;
-    const total = Math.max(liveSeconds, historySeconds ? historySeconds + liveSeconds : 0);
-    const severity = severityFor(total >= STATIONARY.infoThresholdSeconds ? total : null);
+  if (!allSlow || !displacementOk) {
     return {
-      state: { ...state, observations, stationarySince, historySeconds },
+      state: { ...state, observations, stationarySince: null, historySeconds: 0 },
       info: {
-        movementStatus: allSlow && displacementOk ? "STATIONARY" : "MOVING",
-        stationarySince,
-        stationarySeconds: total > 0 ? Math.floor(total) : null,
-        stationarySeverity: severity,
-        stationaryLocation: severity === "NONE" ? "UNKNOWN" : decideLocation(window),
+        movementStatus: "MOVING",
+        stationarySince: null,
+        stationarySeconds: null,
+        stationarySeverity: "NONE",
+        stationaryLocation: "UNKNOWN",
         historyIncomplete: state.historyIncomplete,
         hfpVehicleId: null,
       },
     };
   }
 
-  if (stationarySince === null) stationarySince = window[0]!.ts;
-  const liveSeconds = Math.max(0, (nowMs - stationarySince) / 1000);
+  // Walk back through every retained observation to find the real start of the
+  // stationary stretch, not just the start of the confirmation window.
+  const earliest = earliestStationaryStart(observations);
+  stationarySince =
+    stationarySince === null ? earliest : Math.min(stationarySince, earliest ?? stationarySince);
+
+  const liveSeconds =
+    stationarySince !== null ? Math.max(0, (nowMs - stationarySince) / 1000) : 0;
   const totalSeconds = historySeconds > 0 ? historySeconds + liveSeconds : liveSeconds;
   const severity = severityFor(totalSeconds);
+  const spanSeconds = window.length > 1 ? (latest.ts - window[0]!.ts) / 1000 : 0;
+  const confirmed =
+    spanSeconds >= STATIONARY.observationWindowSeconds ||
+    historySeconds > 0 ||
+    state.stationarySince !== null;
 
   return {
     state: { ...state, observations, stationarySince, historySeconds },
     info: {
-      movementStatus: "STATIONARY",
+      movementStatus: confirmed ? "STATIONARY" : "STATIONARY",
       stationarySince,
-      stationarySeconds: Math.floor(totalSeconds),
+      stationarySeconds: totalSeconds > 0 ? Math.floor(totalSeconds) : null,
       stationarySeverity: severity,
-      stationaryLocation: severity === "NONE" ? "UNKNOWN" : decideLocation(window),
+      stationaryLocation: severity === "NONE" ? "UNKNOWN" : decideLocation(observations),
       historyIncomplete: state.historyIncomplete,
       hfpVehicleId: null,
     },
   };
+}
+
+/**
+ * Earliest timestamp of the current uninterrupted slow-and-in-place stretch.
+ * Movement or a position jump ends the stretch; a long data gap does too, so
+ * an outage is never counted as stationary time.
+ */
+function earliestStationaryStart(observations: Observation[]): number | null {
+  const latest = observations[observations.length - 1];
+  if (!latest) return null;
+  let since: number | null = latest.ts;
+  for (let i = observations.length - 1; i >= 0; i--) {
+    const sample = observations[i]!;
+    if (isMovingSample(sample)) break;
+    const next = observations[i + 1];
+    if (next && (next.ts - sample.ts) / 1000 > STATIONARY.staleAfterSeconds) break;
+    if (
+      sample.lat !== null &&
+      sample.lon !== null &&
+      latest.lat !== null &&
+      latest.lon !== null &&
+      distanceMeters(
+        { lat: sample.lat, lon: sample.lon },
+        { lat: latest.lat, lon: latest.lon },
+      ) > STATIONARY.maxDisplacementMeters
+    ) {
+      break;
+    }
+    since = sample.ts;
+  }
+  return since;
 }
 
 /**
