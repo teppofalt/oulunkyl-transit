@@ -37,6 +37,7 @@ export type RawStoptime = {
     gtfsId: string;
     tripHeadsign: string | null;
     directionId: number | null;
+    departureStoptime: { scheduledDeparture: number | null; serviceDay: number | null } | null;
     route: {
       gtfsId: string;
       shortName: string | null;
@@ -100,6 +101,9 @@ export type Departure = {
   digitransitRouteId: string;
   directionId: number | null;
   serviceDay: number;
+  /** Trip start (first stop scheduled departure) — needed for HFP matching. */
+  tripStartSeconds: number | null;
+  tripStartServiceDay: number | null;
   /** GTFS seconds-from-service-day-start of the scheduled arrival. */
   scheduledArrivalSeconds: number;
 

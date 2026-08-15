@@ -63,6 +63,8 @@ function normalizeOne(stoptime: RawStoptime): Departure | null {
     digitransitRouteId: route.gtfsId,
     directionId: trip.directionId ?? null,
     serviceDay: stoptime.serviceDay,
+    tripStartSeconds: trip.departureStoptime?.scheduledDeparture ?? null,
+    tripStartServiceDay: trip.departureStoptime?.serviceDay ?? stoptime.serviceDay,
     scheduledArrivalSeconds: scheduledSeconds,
     movement: EMPTY_MOVEMENT,
     fintrafficTrainNumber: null,

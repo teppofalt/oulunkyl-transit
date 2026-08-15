@@ -27,6 +27,7 @@ const DEPARTURE_FIELDS = `
     gtfsId
     tripHeadsign
     directionId
+    departureStoptime { scheduledDeparture serviceDay }
     route { gtfsId shortName longName mode }
   }
 `;
