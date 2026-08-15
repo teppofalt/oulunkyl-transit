@@ -1,24 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+import { TransitBoard } from "@/components/transit/TransitBoard";
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Oulunkylä – junat ja ratikka 15 nyt" },
+      {
+        name: "description",
+        content:
+          "Oulunkylän lähtevät lähijunat ja pikaratikka 15 reaaliajassa: saapumisajat, myöhästymiset ja pysähtyneet vuorot yhdellä silmäyksellä.",
+      },
+      { property: "og:title", content: "Oulunkylä – junat ja ratikka 15 nyt" },
+      {
+        property: "og:description",
+        content:
+          "Kevyt reaaliaikanäyttö Oulunkylän lähijunille ja pikaratikalle 15.",
+      },
+      { name: "theme-color", content: "#0b1220" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Oulunkylä" },
+    ],
+    links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/icon-192.png" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
+  return <TransitBoard />;
 }
