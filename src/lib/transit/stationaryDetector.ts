@@ -53,8 +53,9 @@ export function severityFor(stationarySeconds: number | null): StationarySeverit
 }
 
 function trim(observations: Observation[], nowMs: number): Observation[] {
-  const cutoff = nowMs - (STATIONARY.observationWindowSeconds * 4 + 60) * 1000;
-  return observations.filter((o) => o.ts >= cutoff).slice(-200);
+  // Retain well past the warning threshold so long stops keep their true start.
+  const cutoff = nowMs - (STATIONARY.warningThresholdSeconds * 3 + 120) * 1000;
+  return observations.filter((o) => o.ts >= cutoff).slice(-400);
 }
 
 /** Add one observation to the state (mutation-free). */
@@ -201,16 +202,10 @@ export function evaluate(state: DetectorState, nowMs: number): {
     stationarySince !== null ? Math.max(0, (nowMs - stationarySince) / 1000) : 0;
   const totalSeconds = historySeconds > 0 ? historySeconds + liveSeconds : liveSeconds;
   const severity = severityFor(totalSeconds);
-  const spanSeconds = window.length > 1 ? (latest.ts - window[0]!.ts) / 1000 : 0;
-  const confirmed =
-    spanSeconds >= STATIONARY.observationWindowSeconds ||
-    historySeconds > 0 ||
-    state.stationarySince !== null;
-
   return {
     state: { ...state, observations, stationarySince, historySeconds },
     info: {
-      movementStatus: confirmed ? "STATIONARY" : "STATIONARY",
+      movementStatus: "STATIONARY",
       stationarySince,
       stationarySeconds: totalSeconds > 0 ? Math.floor(totalSeconds) : null,
       stationarySeverity: severity,
