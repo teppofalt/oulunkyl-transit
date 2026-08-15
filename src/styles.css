@@ -142,3 +142,275 @@
     color: var(--color-foreground);
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Oulunkylä board theme: calm dark board, high contrast, glanceable.
+ * All colors are tokens; components never hardcode color utilities.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  --board-bg: oklch(0.19 0.03 258);
+  --board-surface: oklch(0.24 0.032 258);
+  --board-surface-strong: oklch(0.28 0.035 258);
+  --board-text: oklch(0.97 0.005 258);
+  --board-muted: oklch(0.74 0.02 258);
+  --board-line: oklch(0.34 0.03 258);
+  --board-train: oklch(0.82 0.14 205);
+  --board-tram: oklch(0.85 0.15 150);
+  --board-info: oklch(0.86 0.13 90);
+  --board-warn: oklch(0.72 0.16 35);
+  --board-radius: 0.75rem;
+  --board-font:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body {
+  background-color: var(--board-bg);
+  color: var(--board-text);
+  font-family: var(--board-font);
+  -webkit-text-size-adjust: 100%;
+}
+
+.board {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 1rem 0.875rem calc(1.5rem + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.board-header h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.subtitle {
+  margin-top: 0.15rem;
+  font-size: 0.8125rem;
+  color: var(--board-muted);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.group-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--board-muted);
+  border-bottom: 1px solid var(--board-line);
+  padding-bottom: 0.35rem;
+}
+
+.direction-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.4rem;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2.75rem 1fr auto;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 3.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--board-radius);
+  background-color: var(--board-surface);
+  border-left: 4px solid var(--board-line);
+}
+
+.row-train {
+  border-left-color: var(--board-train);
+}
+
+.row-tram {
+  border-left-color: var(--board-tram);
+}
+
+.row-warn {
+  background-color: var(--board-surface-strong);
+  outline: 1px solid var(--board-warn);
+}
+
+.row-cancelled {
+  opacity: 0.8;
+  outline: 1px solid var(--board-line);
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  font-size: 1.0625rem;
+  color: var(--board-bg);
+}
+
+.badge-train {
+  background-color: var(--board-train);
+}
+
+.badge-tram {
+  background-color: var(--board-tram);
+}
+
+.row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.clock {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.platform {
+  font-size: 0.75rem;
+  color: var(--board-muted);
+}
+
+.notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+}
+
+.note-muted,
+.note-headsign {
+  color: var(--board-muted);
+}
+
+.note-headsign {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
+}
+
+.note-info {
+  color: var(--board-info);
+  font-weight: 600;
+}
+
+.note-warn {
+  color: var(--board-warn);
+  font-weight: 700;
+}
+
+.row-minutes {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  justify-self: end;
+}
+
+.minutes {
+  font-size: 2.125rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.minutes-unit {
+  font-size: 0.8125rem;
+  color: var(--board-muted);
+}
+
+.cancelled-tag {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--board-warn);
+}
+
+.empty {
+  font-size: 0.8125rem;
+  color: var(--board-muted);
+  padding: 0.5rem 0.125rem;
+}
+
+.alert {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-radius: var(--board-radius);
+  background-color: var(--board-surface-strong);
+  border-left: 4px solid var(--board-info);
+  font-size: 0.8125rem;
+  color: var(--board-text);
+}
+
+.alert-soft {
+  border-left-color: var(--board-muted);
+}
+
+.statusbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-top: 1px solid var(--board-line);
+  padding-top: 0.75rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ctrl {
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border-radius: 999px;
+  border: 1px solid var(--board-line);
+  background-color: var(--board-surface);
+  color: var(--board-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.ctrl:active {
+  background-color: var(--board-surface-strong);
+}
+
+.ctrl-refresh {
+  margin-left: auto;
+  border-color: var(--board-train);
+  color: var(--board-train);
+}
+
+.status-line {
+  font-size: 0.75rem;
+  color: var(--board-muted);
+  font-variant-numeric: tabular-nums;
+}
