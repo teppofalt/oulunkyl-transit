@@ -13,14 +13,14 @@ export function gtfsToEpochMs(serviceDay: number, secondsFromMidnight: number): 
   return (serviceDay + secondsFromMidnight) * 1000;
 }
 
-const clockFormatter = new Intl.DateTimeFormat("fi-FI", {
+const clockFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: HELSINKI_TZ,
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
 });
 
-const clockWithSecondsFormatter = new Intl.DateTimeFormat("fi-FI", {
+const clockWithSecondsFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: HELSINKI_TZ,
   hour: "2-digit",
   minute: "2-digit",

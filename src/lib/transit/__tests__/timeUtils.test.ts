@@ -10,17 +10,17 @@ const SERVICE_DAY_WINTER = Date.UTC(2026, 0, 14, 22, 0, 0) / 1000;
 describe("time calculations", () => {
   it("converts GTFS service day + seconds to a Helsinki clock (DST)", () => {
     const ms = gtfsToEpochMs(SERVICE_DAY_SUMMER, 8 * 3600 + 42 * 60);
-    expect(formatClock(ms)).toBe("08.42");
+    expect(formatClock(ms)).toBe("08:42");
   });
 
   it("converts GTFS service day + seconds outside DST", () => {
     const ms = gtfsToEpochMs(SERVICE_DAY_WINTER, 8 * 3600 + 42 * 60);
-    expect(formatClock(ms)).toBe("08.42");
+    expect(formatClock(ms)).toBe("08:42");
   });
 
   it("handles GTFS times beyond 24:00 crossing midnight", () => {
     const ms = gtfsToEpochMs(SERVICE_DAY_SUMMER, 24 * 3600 + 25 * 60);
-    expect(formatClock(ms)).toBe("00.25");
+    expect(formatClock(ms)).toBe("00:25");
     expect(helsinkiDateString(ms)).toBe("2026-08-16");
   });
 
