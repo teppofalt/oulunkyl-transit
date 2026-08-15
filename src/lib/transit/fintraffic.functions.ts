@@ -8,11 +8,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { resolveMatch, OULUNKYLA_STATION_CODE, type FtTrain } from "./trainMatcher";
+
 const BASE = "https://rata.digitraffic.fi/api/v1";
 const HEADERS = { "Accept-Encoding": "gzip", "Digitraffic-User": "OulunkylaBoard/1.0" };
-/** Oulunkylä station short code in the Finnish rail network. */
-const OULUNKYLA_STATION_CODE = "OLK";
-const HELSINKI_STATION_CODE = "HKI";
 
 export type FintrafficMatch = {
   confidence: "EXACT" | "NONE" | "AMBIGUOUS";
@@ -22,26 +21,10 @@ export type FintrafficMatch = {
   reason?: string;
 };
 
-type TimeTableRow = {
-  stationShortCode: string;
-  type: "ARRIVAL" | "DEPARTURE";
-  scheduledTime: string;
-  trainStopping?: boolean;
-};
-
-type Train = {
-  trainNumber: number;
-  departureDate: string;
-  commuterLineID?: string | null;
-  trainCategory?: string;
-  cancelled?: boolean;
-  timeTableRows: TimeTableRow[];
-};
-
 /**
  * Conservative matching: operating date + commuter line + Oulunkylä stop +
- * exact scheduled Oulunkylä time (±90 s) + direction. Only a single surviving
- * candidate is accepted; 0 or >1 means NONE / AMBIGUOUS and no history is used.
+ * exact scheduled Oulunkylä time + direction. 0 or >1 candidates means
+ * NONE / AMBIGUOUS and no history is used.
  */
 export const matchTrain = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
@@ -56,14 +39,14 @@ export const matchTrain = createServerFn({ method: "GET" })
       .parse(input),
   )
   .handler(async ({ data }): Promise<FintrafficMatch> => {
-    let trains: Train[] = [];
+    let trains: FtTrain[] = [];
     try {
       const url = `${BASE}/live-trains/station/${OULUNKYLA_STATION_CODE}?departure_date=${data.departureDate}&train_categories=Commuter&include_nonstopping=false`;
       const response = await fetch(url, { headers: HEADERS });
       if (!response.ok) {
         return { confidence: "NONE", trainNumber: null, departureDate: null, candidates: 0, reason: `HTTP_${response.status}` };
       }
-      trains = (await response.json()) as Train[];
+      trains = (await response.json()) as FtTrain[];
     } catch (error) {
       return {
         confidence: "NONE",
@@ -78,41 +61,11 @@ export const matchTrain = createServerFn({ method: "GET" })
       return { confidence: "NONE", trainNumber: null, departureDate: null, candidates: 0, reason: "BAD_PAYLOAD" };
     }
 
-    const candidates = trains.filter((train) => {
-      if ((train.commuterLineID ?? "").toUpperCase() !== data.line.toUpperCase()) return false;
-      const rows = train.timeTableRows ?? [];
-      const olkRows = rows.filter(
-        (row) => row.stationShortCode === OULUNKYLA_STATION_CODE && row.trainStopping !== false,
-      );
-      if (olkRows.length === 0) return false;
-      const timeMatch = olkRows.some(
-        (row) => Math.abs(Date.parse(row.scheduledTime) - data.scheduledArrivalMs) <= 90_000,
-      );
-      if (!timeMatch) return false;
-
-      // Direction: is Helsinki reached after Oulunkylä, or before it?
-      const olkIndex = rows.findIndex((row) => row.stationShortCode === OULUNKYLA_STATION_CODE);
-      const lastHki = rows.map((r) => r.stationShortCode).lastIndexOf(HELSINKI_STATION_CODE);
-      if (olkIndex < 0 || lastHki < 0) return false;
-      const towardsHelsinki = lastHki > olkIndex;
-      return data.direction === "HELSINKI" ? towardsHelsinki : !towardsHelsinki;
+    return resolveMatch(trains, {
+      line: data.line,
+      scheduledArrivalMs: data.scheduledArrivalMs,
+      direction: data.direction,
     });
-
-    if (candidates.length === 1) {
-      const train = candidates[0]!;
-      return {
-        confidence: "EXACT",
-        trainNumber: train.trainNumber,
-        departureDate: train.departureDate,
-        candidates: 1,
-      };
-    }
-    return {
-      confidence: candidates.length > 1 ? "AMBIGUOUS" : "NONE",
-      trainNumber: null,
-      departureDate: null,
-      candidates: candidates.length,
-    };
   });
 
 export type HistoryPoint = { ts: number; speed: number | null; lat: number | null; lon: number | null };
