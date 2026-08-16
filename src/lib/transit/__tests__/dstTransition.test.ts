@@ -15,11 +15,12 @@ const SPRING_SERVICE_DAY = Date.UTC(2026, 2, 28, 22, 0, 0) / 1000;
 const AUTUMN_SERVICE_DAY = Date.UTC(2026, 9, 24, 21, 0, 0) / 1000;
 
 describe("Helsinki DST transitions", () => {
-  it("spring: 01:30 before the jump is unaffected", () => {
+  it("spring: the operating day is anchored at noon minus 12 h (GTFS spec)", () => {
+    // Helsinki noon on 2026-03-29 is 09:00 UTC (EEST), so the operating day
+    // starts at 21:00 UTC on 2026-03-28 — 23:00 local, still EET.
     const ms = gtfsToEpochMs(SPRING_SERVICE_DAY, 1 * 3600 + 30 * 60);
-    expect(ms).toBe(Date.UTC(2026, 2, 28, 23, 30, 0));
-    expect(formatClock(ms)).toBe("01:30");
-    expect(helsinkiDateString(ms)).toBe("2026-03-29");
+    expect(ms).toBe(Date.UTC(2026, 2, 28, 22, 30, 0));
+    expect(formatClock(ms)).toBe("00:30");
   });
 
   it("spring: GTFS 05:00 on the transition day is 05:00 local (UTC+3)", () => {
@@ -30,11 +31,14 @@ describe("Helsinki DST transitions", () => {
   });
 
   it("spring: the missing hour does not create a one-hour offset error", () => {
-    // GTFS 03:30 falls into the skipped hour; the absolute instant must still be
-    // exactly 3.5 h after the operating day started.
+    // The instant is exactly 3.5 h after the operating day started, and the
+    // displayed Helsinki clock skips from 02:xx straight to 04:xx.
     const ms = gtfsToEpochMs(SPRING_SERVICE_DAY, 3 * 3600 + 30 * 60);
-    expect(ms).toBe(Date.UTC(2026, 2, 29, 1, 30, 0));
-    expect(minutesUntil(ms, Date.UTC(2026, 2, 29, 1, 0, 0))).toBe(30);
+    expect(ms).toBe(Date.UTC(2026, 2, 29, 0, 30, 0));
+    expect(formatClock(ms)).toBe("02:30");
+    expect(minutesUntil(ms, Date.UTC(2026, 2, 29, 0, 0, 0))).toBe(30);
+    // One hour later in wall-clock terms the Helsinki clock reads 04:30.
+    expect(formatClock(gtfsToEpochMs(SPRING_SERVICE_DAY, 4 * 3600 + 30 * 60))).toBe("04:30");
   });
 
   it("autumn: GTFS 05:00 on the transition day is 05:00 local (UTC+2)", () => {
