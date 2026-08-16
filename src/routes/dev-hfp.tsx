@@ -50,7 +50,8 @@ function DevHfpPage() {
       <h1 style={{ fontSize: 16 }}>HFP-diagnostiikka (kehitys)</h1>
       <p>
         MQTT: {board.status.hfpStatus} · seuranta-horisontti {HFP_MONITORING_HORIZON_MINUTES} min ·
-        seurattuja lähtöjä {rows.length} · lähtöjä taululla {board.departures.length}
+        seurannassa {board.monitoredTripCount} · diagnostiikkarivejä {rows.length} · lähtöjä
+        taululla {board.departures.length}
       </p>
       {rows.length === 0 ? <p>Ei seurattavia lähtöjä juuri nyt.</p> : null}
       <div style={{ overflowX: "auto" }}>
