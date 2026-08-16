@@ -34,6 +34,14 @@ export type DetectorState = {
   historySeconds: number;
   historyIncomplete: boolean;
   lastMovementAt: number | null;
+  /**
+   * Timestamp of the last trusted GPS observation that actually confirmed the
+   * vehicle standing still. Confirmed duration is measured up to this instant —
+   * never up to wall-clock now — so unobserved time adds nothing.
+   */
+  lastReliableObservationAt: number | null;
+  /** Frozen confirmed stationary seconds, only grown by real observations. */
+  confirmedStationarySeconds: number;
 };
 
 export function createState(): DetectorState {
@@ -43,8 +51,11 @@ export function createState(): DetectorState {
     historySeconds: 0,
     historyIncomplete: false,
     lastMovementAt: null,
+    lastReliableObservationAt: null,
+    confirmedStationarySeconds: 0,
   };
 }
+
 
 export function severityFor(stationarySeconds: number | null): StationarySeverity {
   if (stationarySeconds === null) return "NONE";
