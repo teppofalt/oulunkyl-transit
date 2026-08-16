@@ -1,44 +1,55 @@
-import { formatClockWithSeconds } from "@/lib/transit/timeUtils";
-import { STALE_DATA_MS } from "@/lib/transit/config";
+import { formatClock, formatClockWithSeconds } from "@/lib/transit/timeUtils";
+import { isStale, type BoardMode } from "@/lib/transit/boardLogic";
 import type { BoardStatus } from "@/lib/transit/useBoard";
 
 type Props = {
   status: BoardStatus;
   now: number;
-  horizonMinutes: number;
+  mode: BoardMode;
+  moreAvailable: boolean;
   onRefresh: () => void;
   onLater: () => void;
   onFullDay: () => void;
-  onReset: () => void;
+  onBackToLive: () => void;
 };
 
 export function StatusBar({
   status,
   now,
-  horizonMinutes,
+  mode,
+  moreAvailable,
   onRefresh,
   onLater,
   onFullDay,
-  onReset,
+  onBackToLive,
 }: Props) {
-  const stale =
-    status.lastSuccessAt !== null && now - status.lastSuccessAt > STALE_DATA_MS * 2;
+  // Cached data and old data are both surfaced as explicitly not-current.
+  const stale = status.usingCache || isStale(status.lastSuccessAt, now);
 
   return (
     <footer className="statusbar">
+      {stale && status.lastSuccessAt !== null ? (
+        <p className="stale-note" role="status">
+          <strong>Tiedot eivät ehkä ole ajan tasalla</strong>
+          <span>Viimeisin onnistunut päivitys {formatClock(status.lastSuccessAt)}</span>
+        </p>
+      ) : null}
+
       <div className="controls">
-        {horizonMinutes < 24 * 60 ? (
+        {mode === "LIVE" ? (
           <>
-            <button type="button" className="ctrl" onClick={onLater}>
-              Näytä myöhemmät
-            </button>
+            {moreAvailable ? (
+              <button type="button" className="ctrl" onClick={onLater}>
+                Näytä myöhemmät
+              </button>
+            ) : null}
             <button type="button" className="ctrl" onClick={onFullDay}>
               Näytä 24 h
             </button>
           </>
         ) : (
-          <button type="button" className="ctrl" onClick={onReset}>
-            Näytä seuraava tunti
+          <button type="button" className="ctrl" onClick={onBackToLive}>
+            Takaisin live-näkymään
           </button>
         )}
         <button type="button" className="ctrl ctrl-refresh" onClick={onRefresh}>
@@ -48,16 +59,15 @@ export function StatusBar({
 
       <p className="status-line" aria-live="polite">
         {status.lastSuccessAt ? (
-          <>
-            {stale ? "Tiedot eivät ehkä ole ajan tasalla · " : ""}
-            Päivitetty {formatClockWithSeconds(status.lastSuccessAt)}
-          </>
+          <>Päivitetty {formatClockWithSeconds(status.lastSuccessAt)}</>
         ) : status.loading ? (
           "Haetaan lähtöjä…"
+        ) : status.offline ? (
+          "Ei verkkoyhteyttä"
         ) : (
-          "Ei tietoja"
+          "Reaaliaikatieto ei saatavilla"
         )}
-        {horizonMinutes >= 24 * 60 ? " · aikataulunäkymä 24 h" : ""}
+        {mode === "DAY" ? " · aikataulunäkymä 24 h" : ""}
       </p>
     </footer>
   );

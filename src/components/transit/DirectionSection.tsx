@@ -3,9 +3,9 @@ import type { Departure, DirectionGroup } from "@/lib/transit/types";
 
 const TITLES: Record<DirectionGroup, string> = {
   HELSINKI: "HELSINKI ↓",
-  NORTH: "POHJOINEN / MALMI ↑",
+  NORTH: "POHJOINEN ↑",
   KEILANIEMI: "KEILANIEMI",
-  ITAKESKUS: "ITÄKESKUS",
+  ITAKESKUS: "ITÄ",
 };
 
 type Props = {
