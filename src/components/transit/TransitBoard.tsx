@@ -4,11 +4,17 @@ import { DirectionSection } from "./DirectionSection";
 import { StatusBar } from "./StatusBar";
 import { registerServiceWorker } from "@/lib/transit/pwa";
 import { useBoard } from "@/lib/transit/useBoard";
-import { DIRECTION_ORDER, groupByDirection, hasHiddenDepartures } from "@/lib/transit/boardLogic";
+import { DIRECTION_ORDER, groupByDirection } from "@/lib/transit/boardLogic";
 import type { DirectionGroup } from "@/lib/transit/types";
 
 const TRAIN_GROUPS: DirectionGroup[] = ["HELSINKI", "NORTH"];
 const TRAM_GROUPS: DirectionGroup[] = ["KEILANIEMI", "ITAKESKUS"];
+
+const SUBTITLE: Record<string, string> = {
+  LIVE: "Junat ja pikaratikka 15 · seuraava tunti",
+  EXTENDED: "Aikataulu · seuraavat 3 h",
+  DAY: "Aikataulu · seuraavat 24 h",
+};
 
 export function TransitBoard() {
   const board = useBoard();
@@ -30,17 +36,17 @@ export function TransitBoard() {
   }, [grouped, limit]);
 
   const blocked = status.keyMissing || !status.identifiersValid;
+  // Only a true first launch (nothing ever loaded) shows an empty-state notice;
+  // a refresh in flight never removes rows that are already on screen.
   const nothingAvailable =
     !blocked && departures.length === 0 && status.lastSuccessAt === null && !status.loading;
-  const moreAvailable = Number.isFinite(limit) && hasHiddenDepartures(grouped, limit);
+  const firstLoad = !blocked && status.loading && departures.length === 0;
 
   return (
-    <main className="board">
+    <main className="board" data-refreshing={status.refreshing ? "true" : "false"}>
       <header className="board-header">
         <h1>Oulunkylä</h1>
-        <p className="subtitle">
-          {mode === "DAY" ? "Aikataulu · seuraavat 24 h" : "Junat ja pikaratikka 15 · seuraava tunti"}
-        </p>
+        <p className="subtitle">{SUBTITLE[mode]}</p>
       </header>
 
       {status.keyMissing ? (
@@ -59,6 +65,8 @@ export function TransitBoard() {
         </div>
       ) : null}
 
+      {firstLoad ? <p className="placeholder">Haetaan…</p> : null}
+
       {nothingAvailable ? (
         <div className="alert" role="alert">
           <strong>{status.offline ? "Ei verkkoyhteyttä." : "Reaaliaikatieto ei saatavilla."}</strong>
@@ -66,7 +74,7 @@ export function TransitBoard() {
         </div>
       ) : null}
 
-      {!blocked && !nothingAvailable ? (
+      {!blocked && departures.length > 0 ? (
         <>
           <section className="group" aria-labelledby="group-trains">
             <h2 className="group-title" id="group-trains">
@@ -78,7 +86,7 @@ export function TransitBoard() {
                 direction={direction}
                 departures={visible[direction]}
                 now={now}
-                loading={status.loading}
+                loading={false}
               />
             ))}
           </section>
@@ -93,7 +101,7 @@ export function TransitBoard() {
                 direction={direction}
                 departures={visible[direction]}
                 now={now}
-                loading={status.loading}
+                loading={false}
               />
             ))}
           </section>
@@ -104,7 +112,6 @@ export function TransitBoard() {
         status={status}
         now={now}
         mode={mode}
-        moreAvailable={moreAvailable}
         onRefresh={board.refresh}
         onLater={board.showLater}
         onFullDay={board.showFullDay}
