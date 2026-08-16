@@ -150,8 +150,8 @@
 
 :root {
   --board-bg: oklch(0.19 0.03 258);
-  --board-surface: oklch(0.24 0.032 258);
-  --board-surface-strong: oklch(0.28 0.035 258);
+  --board-surface: oklch(0.245 0.032 258);
+  --board-surface-strong: oklch(0.29 0.035 258);
   --board-text: oklch(0.97 0.005 258);
   --board-muted: oklch(0.74 0.02 258);
   --board-line: oklch(0.34 0.03 258);
@@ -413,4 +413,77 @@ body {
   font-size: 0.75rem;
   color: var(--board-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* --- assembly polish: separators, stale banner, glance hierarchy ---------- */
+
+.note-sep {
+  color: var(--board-muted);
+  margin-right: 0.35rem;
+  font-weight: 500;
+}
+
+.notes {
+  gap: 0.35rem;
+}
+
+.minutes {
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+}
+
+.row {
+  min-height: 3.75rem;
+}
+
+.row-tram .clock,
+.row-train .clock {
+  color: var(--board-text);
+}
+
+.row-tram {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--board-tram) 8%, transparent),
+    transparent 45%
+  );
+}
+
+.stale-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--board-radius);
+  background-color: var(--board-surface-strong);
+  border-left: 4px solid var(--board-info);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stale-note span {
+  color: var(--board-muted);
+}
+
+.ctrl:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--board-train);
+  outline-offset: 2px;
+}
+
+@media (max-width: 22.5rem) {
+  .board {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+  .row {
+    grid-template-columns: 2.375rem 1fr auto;
+    gap: 0.5rem;
+  }
+  .minutes {
+    font-size: 2rem;
+  }
+  .note-headsign {
+    max-width: 9.5rem;
+  }
 }

@@ -73,8 +73,9 @@ function DepartureRowBase({ departure, now }: Props) {
         </span>
         {notes.length > 0 ? (
           <span className="notes">
-            {notes.map((note) => (
+            {notes.map((note, index) => (
               <span key={note.text} className={`note note-${note.tone}`}>
+                {index > 0 ? <span className="note-sep" aria-hidden="true">·</span> : null}
                 {note.text}
               </span>
             ))}

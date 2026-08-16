@@ -17,7 +17,8 @@ export const Route = createFileRoute("/")({
         content:
           "Kevyt reaaliaikanäyttö Oulunkylän lähijunille ja pikaratikalle 15.",
       },
-      { name: "theme-color", content: "#0b1220" },
+      { name: "theme-color", content: "#101826" },
+      { name: "application-name", content: "Oulunkylä Live" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
