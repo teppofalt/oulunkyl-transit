@@ -61,7 +61,8 @@ function normalizeOne(stoptime: RawStoptime): Departure | null {
     stopId: stoptime.stop?.gtfsId ?? null,
     digitransitTripId: trip.gtfsId,
     digitransitRouteId: route.gtfsId,
-    directionId: trip.directionId ?? null,
+    // Digitransit returns directionId as a String scalar ("0"/"1").
+    directionId: normalizeDirectionId(trip.directionId),
     serviceDay: stoptime.serviceDay,
     tripStartSeconds: trip.departureStoptime?.scheduledDeparture ?? null,
     tripStartServiceDay: trip.departureStoptime?.serviceDay ?? stoptime.serviceDay,
