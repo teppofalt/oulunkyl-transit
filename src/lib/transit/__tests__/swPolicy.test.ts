@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 // The service worker imports this exact module at runtime.
-import { SHELL_URL, isLiveData, isStaticAsset, shouldCacheAsShell } from "../../../../public/sw-policy.js";
+import {
+  SHELL_URL,
+  isLiveData,
+  isStaticAsset,
+  shouldCacheAsShell,
+} from "../../../../public/sw-policy.js";
 
 const url = (path: string) => new URL(`https://example.test${path}`);
 

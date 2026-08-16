@@ -56,7 +56,6 @@ export function createState(): DetectorState {
   };
 }
 
-
 export function severityFor(stationarySeconds: number | null): StationarySeverity {
   if (stationarySeconds === null) return "NONE";
   if (stationarySeconds >= STATIONARY.warningThresholdSeconds) return "WARNING";
@@ -76,7 +75,9 @@ export function addObservation(
   observation: Observation,
   nowMs: number = observation.ts,
 ): DetectorState {
-  const observations = trim([...state.observations, observation], nowMs).sort((a, b) => a.ts - b.ts);
+  const observations = trim([...state.observations, observation], nowMs).sort(
+    (a, b) => a.ts - b.ts,
+  );
   return { ...state, observations };
 }
 
@@ -275,7 +276,6 @@ function lastReliableStationaryTs(
   }
   return null;
 }
-
 
 /**
  * Earliest timestamp of the current uninterrupted slow-and-in-place stretch.

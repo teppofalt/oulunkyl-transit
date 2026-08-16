@@ -44,7 +44,6 @@ export const PASSED_GRACE_SECONDS = 60;
 /** After this age, cached data is presented as possibly outdated (ms). */
 export const STALE_DATA_MS = 60_000;
 
-
 /** Stationary detector thresholds — keep easy to adjust. */
 export const STATIONARY = {
   /** Speed at or below this counts as not moving (m/s). */

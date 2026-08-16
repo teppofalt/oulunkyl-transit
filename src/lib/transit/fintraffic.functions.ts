@@ -44,7 +44,13 @@ export const matchTrain = createServerFn({ method: "GET" })
       const url = `${BASE}/live-trains/station/${OULUNKYLA_STATION_CODE}?departure_date=${data.departureDate}&train_categories=Commuter&include_nonstopping=false`;
       const response = await fetch(url, { headers: HEADERS });
       if (!response.ok) {
-        return { confidence: "NONE", trainNumber: null, departureDate: null, candidates: 0, reason: `HTTP_${response.status}` };
+        return {
+          confidence: "NONE",
+          trainNumber: null,
+          departureDate: null,
+          candidates: 0,
+          reason: `HTTP_${response.status}`,
+        };
       }
       trains = (await response.json()) as FtTrain[];
     } catch (error) {
@@ -58,7 +64,13 @@ export const matchTrain = createServerFn({ method: "GET" })
     }
 
     if (!Array.isArray(trains)) {
-      return { confidence: "NONE", trainNumber: null, departureDate: null, candidates: 0, reason: "BAD_PAYLOAD" };
+      return {
+        confidence: "NONE",
+        trainNumber: null,
+        departureDate: null,
+        candidates: 0,
+        reason: "BAD_PAYLOAD",
+      };
     }
 
     return resolveMatch(trains, {
@@ -68,7 +80,12 @@ export const matchTrain = createServerFn({ method: "GET" })
     });
   });
 
-export type HistoryPoint = { ts: number; speed: number | null; lat: number | null; lon: number | null };
+export type HistoryPoint = {
+  ts: number;
+  speed: number | null;
+  lat: number | null;
+  lon: number | null;
+};
 
 type LocationRecord = {
   timestamp: string;

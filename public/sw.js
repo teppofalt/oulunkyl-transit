@@ -16,7 +16,12 @@ const VERSION = "v4";
 const STATIC_CACHE = `oulunkyla-static-${VERSION}`;
 const SHELL_CACHE = `oulunkyla-shell-${VERSION}`;
 
-const PRECACHE = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/favicon.png"];
+const PRECACHE = [
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/favicon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -65,7 +70,7 @@ self.addEventListener("fetch", (event) => {
           const cached = await cache.match(SHELL_URL);
           if (cached) return cached;
           return new Response(
-            "<!doctype html><meta charset=utf-8><title>Ei verkkoyhteyttä</title><body style=\"font-family:system-ui;background:#101826;color:#f4f6fb;padding:24px\"><h1>Ei verkkoyhteyttä.</h1><p>Ajantasaisia liikennetietoja ei voida hakea.</p></body>",
+            '<!doctype html><meta charset=utf-8><title>Ei verkkoyhteyttä</title><body style="font-family:system-ui;background:#101826;color:#f4f6fb;padding:24px"><h1>Ei verkkoyhteyttä.</h1><p>Ajantasaisia liikennetietoja ei voida hakea.</p></body>',
             { status: 200, headers: { "content-type": "text/html; charset=utf-8" } },
           );
         }

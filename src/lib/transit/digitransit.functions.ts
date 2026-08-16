@@ -127,11 +127,22 @@ async function validateIdentifiers(): Promise<{ valid: boolean; diagnostics: str
   }
 }
 
-
 type BoardData = {
-  trains: { gtfsId: string; name: string; stoptimesWithoutPatterns: BoardSource["stoptimes"] } | null;
-  tramA: { gtfsId: string; name: string; stoptimesWithoutPatterns: BoardSource["stoptimes"] } | null;
-  tramB: { gtfsId: string; name: string; stoptimesWithoutPatterns: BoardSource["stoptimes"] } | null;
+  trains: {
+    gtfsId: string;
+    name: string;
+    stoptimesWithoutPatterns: BoardSource["stoptimes"];
+  } | null;
+  tramA: {
+    gtfsId: string;
+    name: string;
+    stoptimesWithoutPatterns: BoardSource["stoptimes"];
+  } | null;
+  tramB: {
+    gtfsId: string;
+    name: string;
+    stoptimesWithoutPatterns: BoardSource["stoptimes"];
+  } | null;
 };
 
 export const fetchBoard = createServerFn({ method: "GET" })

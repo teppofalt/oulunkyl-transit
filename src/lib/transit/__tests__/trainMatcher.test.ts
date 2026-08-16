@@ -5,19 +5,52 @@ import { resolveMatch, type FtTrain } from "../trainMatcher";
 const OLK_TIME = "2026-08-15T05:42:00.000Z";
 const OLK_MS = Date.parse(OLK_TIME);
 
-function train(overrides: Partial<FtTrain> & { line: string; olkTime?: string; toHelsinki?: boolean; number: number }): FtTrain {
+function train(
+  overrides: Partial<FtTrain> & {
+    line: string;
+    olkTime?: string;
+    toHelsinki?: boolean;
+    number: number;
+  },
+): FtTrain {
   const olkTime = overrides.olkTime ?? OLK_TIME;
   const toHelsinki = overrides.toHelsinki ?? true;
   const rows = toHelsinki
     ? [
-        { stationShortCode: "KE", type: "DEPARTURE" as const, scheduledTime: "2026-08-15T05:10:00.000Z" },
-        { stationShortCode: "OLK", type: "ARRIVAL" as const, scheduledTime: olkTime, trainStopping: true },
-        { stationShortCode: "HKI", type: "ARRIVAL" as const, scheduledTime: "2026-08-15T05:55:00.000Z" },
+        {
+          stationShortCode: "KE",
+          type: "DEPARTURE" as const,
+          scheduledTime: "2026-08-15T05:10:00.000Z",
+        },
+        {
+          stationShortCode: "OLK",
+          type: "ARRIVAL" as const,
+          scheduledTime: olkTime,
+          trainStopping: true,
+        },
+        {
+          stationShortCode: "HKI",
+          type: "ARRIVAL" as const,
+          scheduledTime: "2026-08-15T05:55:00.000Z",
+        },
       ]
     : [
-        { stationShortCode: "HKI", type: "DEPARTURE" as const, scheduledTime: "2026-08-15T05:30:00.000Z" },
-        { stationShortCode: "OLK", type: "ARRIVAL" as const, scheduledTime: olkTime, trainStopping: true },
-        { stationShortCode: "KE", type: "ARRIVAL" as const, scheduledTime: "2026-08-15T06:15:00.000Z" },
+        {
+          stationShortCode: "HKI",
+          type: "DEPARTURE" as const,
+          scheduledTime: "2026-08-15T05:30:00.000Z",
+        },
+        {
+          stationShortCode: "OLK",
+          type: "ARRIVAL" as const,
+          scheduledTime: olkTime,
+          trainStopping: true,
+        },
+        {
+          stationShortCode: "KE",
+          type: "ARRIVAL" as const,
+          scheduledTime: "2026-08-15T06:15:00.000Z",
+        },
       ];
   return {
     trainNumber: overrides.number,

@@ -59,7 +59,9 @@ export function evaluateIdentifiers(data: ValidationInput | null | undefined): V
     }
     if (tram.gtfsId !== expectedId) {
       valid = false;
-      diagnostics.push(`Raitiovaunupysäkin tunnus ${tram.gtfsId} ei vastaa odotettua ${expectedId}.`);
+      diagnostics.push(
+        `Raitiovaunupysäkin tunnus ${tram.gtfsId} ei vastaa odotettua ${expectedId}.`,
+      );
     }
     if (!tram.name.toLowerCase().includes(fragment)) {
       valid = false;

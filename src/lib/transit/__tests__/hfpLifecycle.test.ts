@@ -39,7 +39,14 @@ function fakeClient() {
 }
 
 function trip(id: string, start = "08:45"): MonitoredTrip {
-  const base = { tripId: id, hfpRoute: "1015", hfpDirection: 1, oday: "2026-08-16", start, mode: "tram" as const };
+  const base = {
+    tripId: id,
+    hfpRoute: "1015",
+    hfpDirection: 1,
+    oday: "2026-08-16",
+    start,
+    mode: "tram" as const,
+  };
   return { ...base, topic: topicFor(base) };
 }
 

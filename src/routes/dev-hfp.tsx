@@ -85,7 +85,10 @@ function DevHfpContent() {
                 "kesto s",
                 "stale",
               ].map((head) => (
-                <th key={head} style={{ borderBottom: "1px solid currentColor", textAlign: "left" }}>
+                <th
+                  key={head}
+                  style={{ borderBottom: "1px solid currentColor", textAlign: "left" }}
+                >
                   {head}
                 </th>
               ))}

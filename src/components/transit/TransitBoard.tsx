@@ -69,7 +69,9 @@ export function TransitBoard() {
 
       {nothingAvailable ? (
         <div className="alert" role="alert">
-          <strong>{status.offline ? "Ei verkkoyhteyttä." : "Reaaliaikatieto ei saatavilla."}</strong>
+          <strong>
+            {status.offline ? "Ei verkkoyhteyttä." : "Reaaliaikatieto ei saatavilla."}
+          </strong>
           <span>Ajantasaisia liikennetietoja ei voida hakea.</span>
         </div>
       ) : null}

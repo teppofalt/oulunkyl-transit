@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  initialRefreshState,
-  refreshFailed,
-  refreshSucceeded,
-  startRefresh,
-} from "../boardState";
+import { initialRefreshState, refreshFailed, refreshSucceeded, startRefresh } from "../boardState";
 import type { BoardPayload } from "../types";
 
 function payload(fetchedAt: number, marker: string): BoardPayload {

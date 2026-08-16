@@ -62,7 +62,9 @@ export function hfpRouteId(routeGtfsId: string): string {
   return parts[parts.length - 1] ?? routeGtfsId;
 }
 
-export function topicFor(trip: Pick<MonitoredTrip, "mode" | "hfpRoute" | "hfpDirection" | "start">) {
+export function topicFor(
+  trip: Pick<MonitoredTrip, "mode" | "hfpRoute" | "hfpDirection" | "start">,
+) {
   // /hfp/v2/journey/ongoing/vp/<mode>/<oper>/<veh>/<route>/<dir>/<headsign>/<start>/#
   return `/hfp/v2/journey/ongoing/vp/${trip.mode}/+/+/${trip.hfpRoute}/${trip.hfpDirection}/+/${trip.start}/#`;
 }
@@ -173,7 +175,6 @@ export function parseVehiclePosition(raw: string): HfpJourney | null {
     },
   };
 }
-
 
 function journeyMatches(trip: MonitoredTrip, journey: HfpJourney): boolean {
   return (

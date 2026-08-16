@@ -54,7 +54,6 @@ export function gtfsToEpochMs(serviceDay: number, secondsFromMidnight: number): 
   return anchor + secondsFromMidnight * 1000;
 }
 
-
 const clockFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: HELSINKI_TZ,
   hour: "2-digit",
@@ -129,7 +128,6 @@ export function distanceMeters(
   const dLon = toRad(b.lon - a.lon);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }

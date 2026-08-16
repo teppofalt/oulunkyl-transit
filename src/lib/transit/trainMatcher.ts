@@ -38,7 +38,8 @@ export function selectCandidates(trains: FtTrain[], query: MatchQuery): FtTrain[
     );
     if (olkRows.length === 0) return false;
     const timeMatch = olkRows.some(
-      (row) => Math.abs(Date.parse(row.scheduledTime) - query.scheduledArrivalMs) <= SCHEDULE_TOLERANCE_MS,
+      (row) =>
+        Math.abs(Date.parse(row.scheduledTime) - query.scheduledArrivalMs) <= SCHEDULE_TOLERANCE_MS,
     );
     if (!timeMatch) return false;
 

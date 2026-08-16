@@ -39,9 +39,9 @@ function stoptime(overrides: {
 
 describe("direction classification", () => {
   it("classifies a train toward Helsinki", () => {
-    expect(classifyDirection(stoptime({ mode: "RAIL", shortName: "K", headsign: "Helsinki" }))).toBe(
-      "HELSINKI",
-    );
+    expect(
+      classifyDirection(stoptime({ mode: "RAIL", shortName: "K", headsign: "Helsinki" })),
+    ).toBe("HELSINKI");
   });
 
   it("classifies a train toward the north", () => {
@@ -51,9 +51,9 @@ describe("direction classification", () => {
   });
 
   it("classifies an unlettered new line by headsign, not by line name", () => {
-    expect(classifyDirection(stoptime({ mode: "RAIL", shortName: "X", headsign: "Tikkurila" }))).toBe(
-      "NORTH",
-    );
+    expect(
+      classifyDirection(stoptime({ mode: "RAIL", shortName: "X", headsign: "Tikkurila" })),
+    ).toBe("NORTH");
   });
 
   it("falls back to route long name plus directionId", () => {
@@ -80,7 +80,11 @@ describe("direction classification", () => {
   });
 
   it("ignores other tram lines and unrelated modes", () => {
-    expect(classifyDirection(stoptime({ mode: "TRAM", shortName: "10", headsign: "Kirurgi" }))).toBeNull();
-    expect(classifyDirection(stoptime({ mode: "BUS", shortName: "506", headsign: "Meilahti" }))).toBeNull();
+    expect(
+      classifyDirection(stoptime({ mode: "TRAM", shortName: "10", headsign: "Kirurgi" })),
+    ).toBeNull();
+    expect(
+      classifyDirection(stoptime({ mode: "BUS", shortName: "506", headsign: "Meilahti" })),
+    ).toBeNull();
   });
 });

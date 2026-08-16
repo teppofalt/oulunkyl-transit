@@ -14,8 +14,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Oulunkylä – junat ja ratikka 15 nyt" },
       {
         property: "og:description",
-        content:
-          "Kevyt reaaliaikanäyttö Oulunkylän lähijunille ja pikaratikalle 15.",
+        content: "Kevyt reaaliaikanäyttö Oulunkylän lähijunille ja pikaratikalle 15.",
       },
       { name: "theme-color", content: "#101826" },
       { name: "application-name", content: "Oulunkylä Live" },

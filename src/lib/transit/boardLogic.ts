@@ -25,12 +25,7 @@ import type { Departure, DirectionGroup } from "./types";
  */
 export type BoardMode = "LIVE" | "EXTENDED" | "DAY";
 
-export const DIRECTION_ORDER: DirectionGroup[] = [
-  "HELSINKI",
-  "NORTH",
-  "KEILANIEMI",
-  "ITAKESKUS",
-];
+export const DIRECTION_ORDER: DirectionGroup[] = ["HELSINKI", "NORTH", "KEILANIEMI", "ITAKESKUS"];
 
 export function horizonForMode(mode: BoardMode): number {
   if (mode === "DAY") return FULL_HORIZON_MINUTES;
@@ -54,7 +49,6 @@ export function rowsPerDirection(mode: BoardMode, steps: number): number {
   if (mode !== "LIVE") return Number.POSITIVE_INFINITY;
   return BASE_ROWS_PER_DIRECTION + steps * ROWS_PER_STEP;
 }
-
 
 export function groupByDirection(departures: Departure[]): Record<DirectionGroup, Departure[]> {
   const map: Record<DirectionGroup, Departure[]> = {

@@ -120,7 +120,11 @@ describe("stationary detection", () => {
     let state = feed(60, POINT);
     const resumeAt = T0 + 60_000 + 10 * 60_000; // 10 min outage
     for (let t = 0; t <= 40; t += 5) {
-      state = addObservation(state, { ts: resumeAt + t * 1000, speed: 0, ...POINT }, resumeAt + t * 1000);
+      state = addObservation(
+        state,
+        { ts: resumeAt + t * 1000, speed: 0, ...POINT },
+        resumeAt + t * 1000,
+      );
     }
     const info = evaluate(state, resumeAt + 40_000).info;
     expect(info.movementStatus).toBe("STATIONARY");
