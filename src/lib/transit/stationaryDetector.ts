@@ -191,7 +191,10 @@ export function evaluate(
 
   // Walk back through retained observations to find the real start of the
   // stationary stretch, not just the start of the confirmation window.
-  const earliest = earliestStationaryStart(observations, medianPoint(window));
+  const earliest = earliestStationaryStart(
+    observations.filter((o) => o.speed !== null || (o.lat !== null && o.lon !== null)),
+    medianPoint(window),
+  );
   const stationarySince =
     state.stationarySince === null
       ? earliest
