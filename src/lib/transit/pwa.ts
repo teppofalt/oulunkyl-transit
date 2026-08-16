@@ -16,7 +16,11 @@ export function registerServiceWorker() {
 
   const register = async () => {
     try {
-      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      const registration = await navigator.serviceWorker.register("/sw.js", {
+        scope: "/",
+        type: "module",
+      });
+
       const check = () => void registration.update().catch(() => undefined);
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") check();

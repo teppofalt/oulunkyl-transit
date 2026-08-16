@@ -1,18 +1,20 @@
 /*
- * Oulunkylä Live — conservative service worker.
+ * Oulunkylä Live — conservative service worker (ES module worker).
  *
  * Rules:
  *  - static app assets: cache-first with a versioned cache
- *  - navigations: network-first, fall back to the cached shell when offline
+ *  - navigations: network-first; only the root document "/" is stored as the
+ *    offline shell (never /dev-hfp or any other page)
  *  - server functions / API traffic: NEVER cached (they carry live transport
  *    data and are produced by an authenticated server-side call; the key itself
  *    never reaches the client, and no request headers are stored here)
  */
 
-const VERSION = "v3";
+import { SHELL_URL, isLiveData, isStaticAsset, shouldCacheAsShell } from "/sw-policy.js";
+
+const VERSION = "v4";
 const STATIC_CACHE = `oulunkyla-static-${VERSION}`;
 const SHELL_CACHE = `oulunkyla-shell-${VERSION}`;
-const SHELL_URL = "/";
 
 const PRECACHE = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/favicon.png"];
 
@@ -40,27 +42,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-/** Live data and anything server-rendered on demand must never be cached. */
-function isLiveData(url) {
-  return (
-    url.pathname.startsWith("/_serverFn") ||
-    url.pathname.includes("_serverFn") ||
-    url.pathname.startsWith("/api/") ||
-    url.searchParams.has("_serverFnId")
-  );
-}
-
-function isStaticAsset(url) {
-  return (
-    url.pathname.startsWith("/_build/") ||
-    url.pathname.startsWith("/assets/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname === "/manifest.webmanifest" ||
-    url.pathname === "/favicon.png" ||
-    /\.(?:js|css|woff2?|png|svg|webp|ico)$/.test(url.pathname)
-  );
-}
-
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -74,7 +55,7 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const response = await fetch(request);
-          if (response && response.ok) {
+          if (shouldCacheAsShell(url, response && response.ok)) {
             const cache = await caches.open(SHELL_CACHE);
             cache.put(SHELL_URL, response.clone());
           }
