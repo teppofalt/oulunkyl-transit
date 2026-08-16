@@ -111,9 +111,34 @@ function robustDisplacement(samples: Observation[]): number {
   return distances[index] ?? 0;
 }
 
+/** Frozen stationary report: duration comes from observations, not the clock. */
+function frozen(state: DetectorState, observations: Observation[]) {
+  const confirmed = state.confirmedStationarySeconds;
+  const stationary = state.stationarySince !== null && confirmed > 0;
+  return {
+    state: { ...state, observations },
+    info: {
+      ...EMPTY_SUMMARY,
+      movementStatus: (stationary ? "STATIONARY" : "UNKNOWN") as MovementSummary["movementStatus"],
+      stationarySince: state.stationarySince,
+      stationarySeconds: stationary ? confirmed : null,
+      stationarySeverity: stationary ? severityFor(confirmed) : "NONE",
+      historyIncomplete: state.historyIncomplete,
+    },
+  };
+}
+
 /**
  * Evaluate the current movement state for one vehicle.
- * Returns the (possibly trimmed) state plus a pure movement summary.
+ *
+ * Evidence rules:
+ *  - STATIONARY requires trusted GPS coordinates: at least
+ *    `minConfirmGpsSamples` positioned samples spanning `minConfirmSpanSeconds`,
+ *    all slow, with a robust displacement inside `maxDisplacementMeters`.
+ *  - Speed-only samples (odometer/non-GPS HFP messages with no coordinates) can
+ *    prove MOVING but can never produce or maintain a STATIONARY state.
+ *  - Confirmed duration is measured up to the last trusted observation, so a
+ *    data gap never inflates it.
  */
 export function evaluate(
   state: DetectorState,
@@ -142,6 +167,7 @@ export function evaluate(
   }
 
   // Movement recovery requires sustained movement, not one noisy sample.
+  // Speed alone is enough here: clearly moving is positive movement evidence.
   const recovery = windowSamples(observations, nowMs - STATIONARY.movementRecoverySeconds * 1000);
   const recoverySpan =
     recovery.length >= 2 ? (recovery[recovery.length - 1]!.ts - recovery[0]!.ts) / 1000 : 0;
@@ -152,79 +178,104 @@ export function evaluate(
 
   if (sustainedMovement) {
     return {
-      state: { ...next, stationarySince: null, historySeconds: 0, lastMovementAt: nowMs },
+      state: {
+        ...next,
+        stationarySince: null,
+        historySeconds: 0,
+        lastMovementAt: nowMs,
+        lastReliableObservationAt: latest.ts,
+        confirmedStationarySeconds: 0,
+      },
       info: { ...EMPTY_SUMMARY, movementStatus: "MOVING" },
     };
   }
 
-  // Samples without speed AND without position carry no evidence (e.g. HFP
-  // messages positioned by odometer only) — never infer standing still from them.
-  const window = windowSamples(
-    observations,
-    nowMs - STATIONARY.observationWindowSeconds * 1000,
-  ).filter((o) => o.speed !== null || (o.lat !== null && o.lon !== null));
+  // Only trusted GPS observations count as stationary evidence.
+  const window = positioned(
+    windowSamples(observations, nowMs - STATIONARY.observationWindowSeconds * 1000),
+  );
   const span = window.length >= 2 ? (window[window.length - 1]!.ts - window[0]!.ts) / 1000 : 0;
   const enoughEvidence =
-    window.length >= STATIONARY.minConfirmSamples && span >= STATIONARY.minConfirmSpanSeconds;
+    window.length >= STATIONARY.minConfirmGpsSamples && span >= STATIONARY.minConfirmSpanSeconds;
   // A single fast sample among slow ones is treated as noise, not movement.
   const movingCount = window.filter(isMovingSample).length;
   const allSlow = window.length > 0 && movingCount <= (window.length >= 4 ? 1 : 0);
+  const reference = medianPoint(window);
   const inPlace = robustDisplacement(window) <= STATIONARY.maxDisplacementMeters;
 
   if (!enoughEvidence) {
-    // Not enough evidence either way: keep the previous stationary start but
-    // do not assert a state.
-    return {
-      state: next,
-      info: {
-        ...EMPTY_SUMMARY,
-        movementStatus: state.stationarySince !== null ? "STATIONARY" : "UNKNOWN",
-        stationarySince: state.stationarySince,
-        stationarySeconds:
-          state.stationarySince !== null
-            ? Math.floor(Math.max(0, (nowMs - state.stationarySince) / 1000))
-            : null,
-        stationarySeverity:
-          state.stationarySince !== null
-            ? severityFor(Math.floor(Math.max(0, (nowMs - state.stationarySince) / 1000)))
-            : "NONE",
-        historyIncomplete: state.historyIncomplete,
-      },
-    };
+    // Not enough trusted position evidence: report only what was observed.
+    return frozen(next, observations);
   }
 
   if (!allSlow || !inPlace) {
     return {
-      state: { ...next, stationarySince: null, historySeconds: 0 },
+      state: {
+        ...next,
+        stationarySince: null,
+        historySeconds: 0,
+        confirmedStationarySeconds: 0,
+        lastReliableObservationAt: latest.ts,
+      },
       info: { ...EMPTY_SUMMARY, movementStatus: "MOVING" },
     };
   }
 
-  // Walk back through retained observations to find the real start of the
-  // stationary stretch, not just the start of the confirmation window.
-  const earliest = earliestStationaryStart(
-    observations.filter((o) => o.speed !== null || (o.lat !== null && o.lon !== null)),
-    medianPoint(window),
-  );
+  // Walk back through retained trusted observations to find the real start of
+  // the stationary stretch, not just the start of the confirmation window.
+  const trusted = positioned(observations);
+  const earliest = earliestStationaryStart(trusted, reference);
   const stationarySince =
     state.stationarySince === null
       ? earliest
       : Math.min(state.stationarySince, earliest ?? state.stationarySince);
 
-  const liveSeconds = stationarySince !== null ? Math.max(0, (nowMs - stationarySince) / 1000) : 0;
+  // Duration end point: the newest trusted, slow, in-place observation.
+  const lastReliable = lastReliableStationaryTs(trusted, reference) ?? latest.ts;
+  const liveSeconds =
+    stationarySince !== null ? Math.max(0, (lastReliable - stationarySince) / 1000) : 0;
   const totalSeconds = state.historySeconds > 0 ? state.historySeconds + liveSeconds : liveSeconds;
+  const confirmed = Math.floor(totalSeconds);
 
   return {
-    state: { ...next, stationarySince },
+    state: {
+      ...next,
+      stationarySince,
+      lastReliableObservationAt: lastReliable,
+      confirmedStationarySeconds: confirmed,
+    },
     info: {
       movementStatus: "STATIONARY",
       stationarySince,
-      stationarySeconds: totalSeconds > 0 ? Math.floor(totalSeconds) : null,
-      stationarySeverity: severityFor(totalSeconds),
+      stationarySeconds: confirmed > 0 ? confirmed : null,
+      stationarySeverity: severityFor(confirmed),
       historyIncomplete: state.historyIncomplete,
     },
   };
 }
+
+/** Newest trusted observation that is slow and inside the in-place radius. */
+function lastReliableStationaryTs(
+  trusted: Observation[],
+  reference: { lat: number; lon: number } | null,
+): number | null {
+  for (let i = trusted.length - 1; i >= 0; i--) {
+    const sample = trusted[i]!;
+    if (isMovingSample(sample)) continue;
+    if (
+      reference !== null &&
+      sample.lat !== null &&
+      sample.lon !== null &&
+      distanceMeters({ lat: sample.lat, lon: sample.lon }, reference) >
+        STATIONARY.maxDisplacementMeters
+    ) {
+      continue;
+    }
+    return sample.ts;
+  }
+  return null;
+}
+
 
 /**
  * Earliest timestamp of the current uninterrupted slow-and-in-place stretch.
