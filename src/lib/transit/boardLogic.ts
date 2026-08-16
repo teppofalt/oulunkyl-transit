@@ -78,16 +78,17 @@ export function hasHiddenDepartures(
 /**
  * Trips eligible for HFP monitoring.
  *
- * Rules (battery/CPU): only in LIVE mode, only while the page is visible, only
- * inside the 30-minute monitoring horizon, never the 24 h dataset, and always
- * capped.
+ * Rules (battery/CPU): never in the 24 h timetable mode, only while the page is
+ * visible, only inside the 30-minute monitoring horizon — the 180-minute
+ * extended view does NOT widen it — and always capped.
  */
 export function selectMonitoredTrips(
   departures: Departure[],
   nowMs: number,
   opts: { mode: BoardMode; visible: boolean },
 ): MonitoredTrip[] {
-  if (opts.mode !== "LIVE" || !opts.visible) return [];
+  if (opts.mode === "DAY" || !opts.visible) return [];
+
   const limit = nowMs + HFP_MONITORING_HORIZON_MINUTES * 60_000;
   const floor = nowMs - PASSED_GRACE_SECONDS * 1000;
   return departures
