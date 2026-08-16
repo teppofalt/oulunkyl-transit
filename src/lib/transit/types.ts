@@ -42,7 +42,8 @@ export type RawStoptime = {
   trip: {
     gtfsId: string;
     tripHeadsign: string | null;
-    directionId: number | null;
+    /** Digitransit returns this as a String scalar ("0" / "1"). */
+    directionId: number | string | null;
     departureStoptime: { scheduledDeparture: number | null; serviceDay: number | null } | null;
     route: {
       gtfsId: string;
