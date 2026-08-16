@@ -11,7 +11,13 @@ export type MovementStatus = "UNKNOWN" | "MOVING" | "STATIONARY" | "STALE";
 
 export type StationarySeverity = "NONE" | "INFO" | "WARNING";
 
-export type StationaryLocation = "UNKNOWN" | "AT_STATION" | "ON_TRACK";
+/** HFP vehicle matching state — kept strictly separate from movement state. */
+export type HfpMatchStatus =
+  | "NOT_MONITORED"
+  | "SEARCHING"
+  | "MATCHED"
+  | "NO_MATCH"
+  | "AMBIGUOUS";
 
 export type MatchConfidence = "EXACT" | "NONE" | "AMBIGUOUS";
 
@@ -36,7 +42,8 @@ export type RawStoptime = {
   trip: {
     gtfsId: string;
     tripHeadsign: string | null;
-    directionId: number | null;
+    /** Digitransit returns this as a String scalar ("0" / "1"). */
+    directionId: number | string | null;
     departureStoptime: { scheduledDeparture: number | null; serviceDay: number | null } | null;
     route: {
       gtfsId: string;
@@ -62,16 +69,31 @@ export type BoardPayload = {
   sources: BoardSource[];
 };
 
-/** Movement information derived from HFP / Fintraffic, kept out of the
- *  timetable data so presentation state and 1 Hz movement state stay apart. */
-export type MovementInfo = {
+/** Pure output of the stationary detector for a single vehicle. */
+export type MovementSummary = {
   movementStatus: MovementStatus;
   stationarySince: number | null;
   stationarySeconds: number | null;
   stationarySeverity: StationarySeverity;
-  stationaryLocation: StationaryLocation;
+  /** True when the observation series had gaps; duration is then untrustworthy. */
   historyIncomplete: boolean;
+};
+
+/**
+ * Movement information published to the UI. Match status, movement status and
+ * stationary severity are deliberately independent fields.
+ */
+export type MovementInfo = MovementSummary & {
+  matchStatus: HfpMatchStatus;
+  /** "operatorId/vehicleNumber" — the locked physical vehicle identity. */
   hfpVehicleId: string | null;
+  hfpOperatorId: number | null;
+  hfpVehicleNumber: number | null;
+  lastObservationAt: number | null;
+  lastSpeedMps: number | null;
+  lastLat: number | null;
+  lastLon: number | null;
+  locationSource: string | null;
 };
 
 export type Departure = {
@@ -114,12 +136,23 @@ export type Departure = {
   fintrafficMatchConfidence: MatchConfidence;
 };
 
-export const EMPTY_MOVEMENT: MovementInfo = {
+export const EMPTY_SUMMARY: MovementSummary = {
   movementStatus: "UNKNOWN",
   stationarySince: null,
   stationarySeconds: null,
   stationarySeverity: "NONE",
-  stationaryLocation: "UNKNOWN",
   historyIncomplete: false,
+};
+
+export const EMPTY_MOVEMENT: MovementInfo = {
+  ...EMPTY_SUMMARY,
+  matchStatus: "NOT_MONITORED",
   hfpVehicleId: null,
+  hfpOperatorId: null,
+  hfpVehicleNumber: null,
+  lastObservationAt: null,
+  lastSpeedMps: null,
+  lastLat: null,
+  lastLon: null,
+  locationSource: null,
 };

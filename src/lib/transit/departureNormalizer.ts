@@ -5,6 +5,13 @@ import { gtfsToEpochMs } from "./timeUtils";
 import { PASSED_GRACE_SECONDS } from "./config";
 import { EMPTY_MOVEMENT, type BoardPayload, type Departure, type RawStoptime } from "./types";
 
+/** Digitransit exposes directionId as a String scalar; only 0/1 are usable. */
+function normalizeDirectionId(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return parsed === 0 || parsed === 1 ? parsed : null;
+}
+
 function isCancelled(stoptime: RawStoptime): boolean {
   const state = (stoptime.realtimeState ?? "").toUpperCase();
   return state === "CANCELED" || state === "CANCELLED";
@@ -61,7 +68,8 @@ function normalizeOne(stoptime: RawStoptime): Departure | null {
     stopId: stoptime.stop?.gtfsId ?? null,
     digitransitTripId: trip.gtfsId,
     digitransitRouteId: route.gtfsId,
-    directionId: trip.directionId ?? null,
+    // Digitransit returns directionId as a String scalar ("0"/"1").
+    directionId: normalizeDirectionId(trip.directionId),
     serviceDay: stoptime.serviceDay,
     tripStartSeconds: trip.departureStoptime?.scheduledDeparture ?? null,
     tripStartServiceDay: trip.departureStoptime?.serviceDay ?? stoptime.serviceDay,

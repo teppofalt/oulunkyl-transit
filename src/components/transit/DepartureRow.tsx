@@ -4,23 +4,21 @@ import { formatClock, minutesUntil } from "@/lib/transit/timeUtils";
 import { STATIONARY } from "@/lib/transit/config";
 import type { Departure } from "@/lib/transit/types";
 
+/**
+ * Stationary label. Only a MATCHED HFP vehicle may produce movement text;
+ * NO_MATCH / AMBIGUOUS / STALE never show a guessed status.
+ * Station-vs-track wording is intentionally not used in this phase.
+ */
 function stationaryText(departure: Departure): { text: string; severity: "INFO" | "WARNING" } | null {
   const { movement } = departure;
+  if (movement.matchStatus !== "MATCHED") return null;
+  if (movement.movementStatus !== "STATIONARY") return null;
   if (movement.stationarySeverity === "NONE" || movement.stationarySeconds === null) return null;
-  if (movement.historyIncomplete) {
-    return { text: "Liikehistoria puutteellinen", severity: "INFO" };
-  }
   const minutes = Math.floor(movement.stationarySeconds / 60);
   if (movement.stationarySeconds >= STATIONARY.warningThresholdSeconds) {
     return { text: `Pitkittynyt pysähdys · ${minutes} min`, severity: "WARNING" };
   }
-  const where =
-    movement.stationaryLocation === "AT_STATION"
-      ? "Paikallaan asemalla"
-      : movement.stationaryLocation === "ON_TRACK"
-        ? "Paikallaan radalla"
-        : "Paikallaan";
-  return { text: `${where} ${minutes} min`, severity: "INFO" };
+  return { text: `Paikallaan ${minutes} min`, severity: "INFO" };
 }
 
 type Props = { departure: Departure; now: number };
@@ -44,7 +42,10 @@ function DepartureRowBase({ departure, now }: Props) {
   if (stationary) {
     notes.push({ text: stationary.text, tone: stationary.severity === "WARNING" ? "warn" : "info" });
   }
-  if (departure.movement.movementStatus === "STALE") {
+  if (
+    departure.movement.matchStatus === "MATCHED" &&
+    departure.movement.movementStatus === "STALE"
+  ) {
     notes.push({ text: "Liiketieto ei saatavilla", tone: "muted" });
   }
 
