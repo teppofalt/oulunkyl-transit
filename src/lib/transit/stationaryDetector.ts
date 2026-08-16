@@ -6,13 +6,16 @@
  *
  * Design rules:
  *  - never rely on a single `speed === 0` sample
+ *  - never clear a stationary state from one anomalous GPS point
  *  - a data outage is NOT confirmed stationary time
  *  - prefer uncertainty over false precision
+ *
+ * Station-vs-track classification is intentionally NOT part of this phase.
  */
 
-import { STATIONARY, OULUNKYLA_COORDS } from "./config";
+import { STATIONARY } from "./config";
 import { distanceMeters } from "./timeUtils";
-import type { MovementInfo, StationaryLocation, StationarySeverity } from "./types";
+import { EMPTY_SUMMARY, type MovementSummary, type StationarySeverity } from "./types";
 
 export type Observation = {
   /** Epoch ms of the observation. */
@@ -21,8 +24,6 @@ export type Observation = {
   speed: number | null;
   lat: number | null;
   lon: number | null;
-  /** True when the operator reports the vehicle standing at a stop/station. */
-  atStop?: boolean | null;
 };
 
 export type DetectorState = {
@@ -52,10 +53,10 @@ export function severityFor(stationarySeconds: number | null): StationarySeverit
   return "NONE";
 }
 
+/** Small rolling history only: a few minutes, hard-capped sample count. */
 function trim(observations: Observation[], nowMs: number): Observation[] {
-  // Retain well past the warning threshold so long stops keep their true start.
-  const cutoff = nowMs - (STATIONARY.warningThresholdSeconds * 3 + 120) * 1000;
-  return observations.filter((o) => o.ts >= cutoff).slice(-400);
+  const cutoff = nowMs - STATIONARY.historyRetentionSeconds * 1000;
+  return observations.filter((o) => o.ts >= cutoff).slice(-STATIONARY.maxObservations);
 }
 
 /** Add one observation to the state (mutation-free). */
@@ -64,9 +65,7 @@ export function addObservation(
   observation: Observation,
   nowMs: number = observation.ts,
 ): DetectorState {
-  const observations = trim([...state.observations, observation], nowMs).sort(
-    (a, b) => a.ts - b.ts,
-  );
+  const observations = trim([...state.observations, observation], nowMs).sort((a, b) => a.ts - b.ts);
   return { ...state, observations };
 }
 
@@ -78,140 +77,132 @@ function windowSamples(observations: Observation[], fromMs: number): Observation
   return observations.filter((o) => o.ts >= fromMs);
 }
 
-function maxDisplacement(samples: Observation[]): number {
-  const points = samples.filter(
+function positioned(samples: Observation[]) {
+  return samples.filter(
     (s): s is Observation & { lat: number; lon: number } => s.lat !== null && s.lon !== null,
   );
-  if (points.length < 2) return 0;
-  let max = 0;
-  for (const p of points) {
-    const d = distanceMeters(
-      { lat: points[0]!.lat, lon: points[0]!.lon },
-      { lat: p.lat, lon: p.lon },
-    );
-    if (d > max) max = d;
-  }
-  return max;
-}
-
-function decideLocation(samples: Observation[]): StationaryLocation {
-  const points = samples.filter(
-    (s): s is Observation & { lat: number; lon: number } => s.lat !== null && s.lon !== null,
-  );
-  if (points.length < STATIONARY.minObservationsForLocation) return "UNKNOWN";
-  const last = points[points.length - 1]!;
-  if (samples.some((s) => s.atStop)) return "AT_STATION";
-  const d = distanceMeters(OULUNKYLA_COORDS, { lat: last.lat, lon: last.lon });
-  return d <= STATIONARY.stationRadiusMeters ? "AT_STATION" : "ON_TRACK";
 }
 
 /**
- * Evaluate the current movement state.
- * `historySeconds` (from Fintraffic) is merged without double counting: the
- * displayed duration is max(live duration, history + live overlap-free part).
+ * Displacement inside a sample set, ignoring one worst outlier when there are
+ * enough points — a single bad GPS fix must not look like movement.
  */
-export function evaluate(state: DetectorState, nowMs: number): {
-  state: DetectorState;
-  info: MovementInfo;
-} {
+function robustDisplacement(samples: Observation[]): number {
+  const points = positioned(samples);
+  if (points.length < 2) return 0;
+  // Reference is the temporal median point, so one jumped fix (which is often
+  // the newest sample) cannot dominate the result.
+  const reference = points[Math.floor((points.length - 1) / 2)]!;
+  const distances = points
+    .map((p) => distanceMeters(reference, { lat: p.lat, lon: p.lon }))
+    .sort((a, b) => a - b);
+  const index = distances.length >= 4 ? distances.length - 2 : distances.length - 1;
+  return distances[index] ?? 0;
+}
+
+/**
+ * Evaluate the current movement state for one vehicle.
+ * Returns the (possibly trimmed) state plus a pure movement summary.
+ */
+export function evaluate(
+  state: DetectorState,
+  nowMs: number,
+): { state: DetectorState; info: MovementSummary } {
   const observations = trim(state.observations, nowMs);
   const latest = observations[observations.length - 1];
+  const next = { ...state, observations };
 
   if (!latest) {
-    return {
-      state: { ...state, observations },
-      info: {
-        movementStatus: "UNKNOWN",
-        stationarySince: null,
-        stationarySeconds: null,
-        stationarySeverity: "NONE",
-        stationaryLocation: "UNKNOWN",
-        historyIncomplete: state.historyIncomplete,
-        hfpVehicleId: null,
-      },
-    };
+    return { state: next, info: { ...EMPTY_SUMMARY, historyIncomplete: state.historyIncomplete } };
   }
 
   const ageSeconds = (nowMs - latest.ts) / 1000;
   if (ageSeconds > STATIONARY.staleAfterSeconds) {
-    // Data outage: freeze, do not accumulate stationary time.
+    // Data outage: freeze, never accumulate stationary time across the gap.
     return {
-      state: { ...state, observations },
+      state: next,
       info: {
+        ...EMPTY_SUMMARY,
         movementStatus: "STALE",
         stationarySince: state.stationarySince,
-        stationarySeconds: null,
-        stationarySeverity: "NONE",
-        stationaryLocation: "UNKNOWN",
         historyIncomplete: true,
-        hfpVehicleId: null,
       },
     };
   }
 
+  // Movement recovery requires sustained movement, not one noisy sample.
   const recovery = windowSamples(observations, nowMs - STATIONARY.movementRecoverySeconds * 1000);
+  const recoverySpan =
+    recovery.length >= 2 ? (recovery[recovery.length - 1]!.ts - recovery[0]!.ts) / 1000 : 0;
   const sustainedMovement =
-    recovery.length > 0 && recovery.every(isMovingSample) && recovery.some(isMovingSample);
-
-  let stationarySince = state.stationarySince;
-  let historySeconds = state.historySeconds;
+    recovery.length >= 2 &&
+    recoverySpan >= STATIONARY.movementRecoverySeconds * 0.8 &&
+    recovery.every(isMovingSample);
 
   if (sustainedMovement) {
-    // Vehicle is moving again: clear stationary state and inherited history.
     return {
-      state: { ...state, observations, stationarySince: null, historySeconds: 0, lastMovementAt: nowMs },
-      info: {
-        movementStatus: "MOVING",
-        stationarySince: null,
-        stationarySeconds: null,
-        stationarySeverity: "NONE",
-        stationaryLocation: "UNKNOWN",
-        historyIncomplete: false,
-        hfpVehicleId: null,
-      },
+      state: { ...next, stationarySince: null, historySeconds: 0, lastMovementAt: nowMs },
+      info: { ...EMPTY_SUMMARY, movementStatus: "MOVING" },
     };
   }
 
-  const windowStart = nowMs - STATIONARY.observationWindowSeconds * 1000;
-  const window = windowSamples(observations, windowStart);
-  const allSlow = window.length > 0 && window.every((o) => !isMovingSample(o));
-  const displacementOk = maxDisplacement(window) <= STATIONARY.maxDisplacementMeters;
+  const window = windowSamples(observations, nowMs - STATIONARY.observationWindowSeconds * 1000);
+  const span = window.length >= 2 ? (window[window.length - 1]!.ts - window[0]!.ts) / 1000 : 0;
+  const enoughEvidence =
+    window.length >= STATIONARY.minConfirmSamples && span >= STATIONARY.minConfirmSpanSeconds;
+  // A single fast sample among slow ones is treated as noise, not movement.
+  const movingCount = window.filter(isMovingSample).length;
+  const allSlow = window.length > 0 && movingCount <= (window.length >= 4 ? 1 : 0);
+  const inPlace = robustDisplacement(window) <= STATIONARY.maxDisplacementMeters;
 
-  if (!allSlow || !displacementOk) {
+  if (!enoughEvidence) {
+    // Not enough evidence either way: keep the previous stationary start but
+    // do not assert a state.
     return {
-      state: { ...state, observations, stationarySince: null, historySeconds: 0 },
+      state: next,
       info: {
-        movementStatus: "MOVING",
-        stationarySince: null,
-        stationarySeconds: null,
-        stationarySeverity: "NONE",
-        stationaryLocation: "UNKNOWN",
+        ...EMPTY_SUMMARY,
+        movementStatus: state.stationarySince !== null ? "STATIONARY" : "UNKNOWN",
+        stationarySince: state.stationarySince,
+        stationarySeconds:
+          state.stationarySince !== null
+            ? Math.floor(Math.max(0, (nowMs - state.stationarySince) / 1000))
+            : null,
+        stationarySeverity:
+          state.stationarySince !== null
+            ? severityFor(Math.floor(Math.max(0, (nowMs - state.stationarySince) / 1000)))
+            : "NONE",
         historyIncomplete: state.historyIncomplete,
-        hfpVehicleId: null,
       },
     };
   }
 
-  // Walk back through every retained observation to find the real start of the
-  // stationary stretch, not just the start of the confirmation window.
-  const earliest = earliestStationaryStart(observations);
-  stationarySince =
-    stationarySince === null ? earliest : Math.min(stationarySince, earliest ?? stationarySince);
+  if (!allSlow || !inPlace) {
+    return {
+      state: { ...next, stationarySince: null, historySeconds: 0 },
+      info: { ...EMPTY_SUMMARY, movementStatus: "MOVING" },
+    };
+  }
 
-  const liveSeconds =
-    stationarySince !== null ? Math.max(0, (nowMs - stationarySince) / 1000) : 0;
-  const totalSeconds = historySeconds > 0 ? historySeconds + liveSeconds : liveSeconds;
-  const severity = severityFor(totalSeconds);
+  // Walk back through retained observations to find the real start of the
+  // stationary stretch, not just the start of the confirmation window.
+  const earliest = earliestStationaryStart(observations, medianPoint(window));
+  const stationarySince =
+    state.stationarySince === null
+      ? earliest
+      : Math.min(state.stationarySince, earliest ?? state.stationarySince);
+
+  const liveSeconds = stationarySince !== null ? Math.max(0, (nowMs - stationarySince) / 1000) : 0;
+  const totalSeconds = state.historySeconds > 0 ? state.historySeconds + liveSeconds : liveSeconds;
+
   return {
-    state: { ...state, observations, stationarySince, historySeconds },
+    state: { ...next, stationarySince },
     info: {
       movementStatus: "STATIONARY",
       stationarySince,
       stationarySeconds: totalSeconds > 0 ? Math.floor(totalSeconds) : null,
-      stationarySeverity: severity,
-      stationaryLocation: severity === "NONE" ? "UNKNOWN" : decideLocation(observations),
+      stationarySeverity: severityFor(totalSeconds),
       historyIncomplete: state.historyIncomplete,
-      hfpVehicleId: null,
     },
   };
 }
@@ -221,36 +212,50 @@ export function evaluate(state: DetectorState, nowMs: number): {
  * Movement or a position jump ends the stretch; a long data gap does too, so
  * an outage is never counted as stationary time.
  */
-function earliestStationaryStart(observations: Observation[]): number | null {
+function earliestStationaryStart(
+  observations: Observation[],
+  reference: { lat: number; lon: number } | null,
+): number | null {
   const latest = observations[observations.length - 1];
   if (!latest) return null;
   let since: number | null = latest.ts;
+  // One anomalous sample (fast reading or jumped fix) is tolerated without
+  // ending the stretch; two in a row end it.
+  let anomalies = 0;
   for (let i = observations.length - 1; i >= 0; i--) {
     const sample = observations[i]!;
-    if (isMovingSample(sample)) break;
-    const next = observations[i + 1];
-    if (next && (next.ts - sample.ts) / 1000 > STATIONARY.staleAfterSeconds) break;
-    if (
+    const nextSample = observations[i + 1];
+    if (nextSample && (nextSample.ts - sample.ts) / 1000 > STATIONARY.staleAfterSeconds) break;
+
+    const jumped =
+      reference !== null &&
       sample.lat !== null &&
       sample.lon !== null &&
-      latest.lat !== null &&
-      latest.lon !== null &&
-      distanceMeters(
-        { lat: sample.lat, lon: sample.lon },
-        { lat: latest.lat, lon: latest.lon },
-      ) > STATIONARY.maxDisplacementMeters
-    ) {
-      break;
+      distanceMeters({ lat: sample.lat, lon: sample.lon }, reference) >
+        STATIONARY.maxDisplacementMeters;
+
+    if (isMovingSample(sample) || jumped) {
+      anomalies += 1;
+      if (anomalies > 1) break;
+      continue;
     }
+    anomalies = 0;
     since = sample.ts;
   }
   return since;
 }
 
+/** Temporal median position of a sample set, used as a robust reference. */
+function medianPoint(samples: Observation[]): { lat: number; lon: number } | null {
+  const points = positioned(samples);
+  if (points.length === 0) return null;
+  const p = points[Math.floor((points.length - 1) / 2)]!;
+  return { lat: p.lat, lon: p.lon };
+}
+
 /**
  * Seed the detector with stationary time observed before the app was opened.
- * `incomplete` marks history with gaps; the caller must not present a precise
- * duration in that case.
+ * Not used in the HFP phase (kept for a later retrospective-history source).
  */
 export function seedHistory(
   state: DetectorState,
@@ -267,30 +272,29 @@ export function seedHistory(
 }
 
 /**
- * Compute confirmed stationary seconds from a historical position series
- * (e.g. Fintraffic train locations). Gaps longer than
- * STATIONARY.maxHistoryGapSeconds break the chain and mark the result
- * incomplete instead of inventing stationary time.
+ * Compute confirmed stationary seconds from a historical position series.
+ * Gaps longer than STATIONARY.maxHistoryGapSeconds break the chain and mark
+ * the result incomplete instead of inventing stationary time.
  */
 export function stationaryFromHistory(
   history: Observation[],
-  nowMs: number,
+  _nowMs: number,
 ): { seconds: number; incomplete: boolean; since: number | null } {
   const sorted = [...history].sort((a, b) => a.ts - b.ts);
   if (sorted.length < 2) return { seconds: 0, incomplete: true, since: null };
 
+  const reference = sorted[sorted.length - 1]!;
   let since: number | null = null;
   let incomplete = false;
 
   for (let i = sorted.length - 1; i >= 0; i--) {
     const sample = sorted[i]!;
     if (isMovingSample(sample)) break;
-    const next = sorted[i + 1];
-    if (next && (next.ts - sample.ts) / 1000 > STATIONARY.maxHistoryGapSeconds) {
+    const nextSample = sorted[i + 1];
+    if (nextSample && (nextSample.ts - sample.ts) / 1000 > STATIONARY.maxHistoryGapSeconds) {
       incomplete = true;
       break;
     }
-    const reference = sorted[sorted.length - 1]!;
     if (
       sample.lat !== null &&
       sample.lon !== null &&
@@ -306,10 +310,6 @@ export function stationaryFromHistory(
     since = sample.ts;
   }
 
-  const last = sorted[sorted.length - 1]!;
-  if ((nowMs - last.ts) / 1000 > STATIONARY.maxHistoryGapSeconds) incomplete = true;
-
-  if (since === null) return { seconds: 0, incomplete, since: null };
-  const seconds = Math.max(0, (last.ts - since) / 1000);
-  return { seconds: Math.floor(seconds), incomplete, since };
+  const seconds = since === null ? 0 : Math.max(0, Math.floor((reference.ts - since) / 1000));
+  return { seconds, incomplete, since };
 }

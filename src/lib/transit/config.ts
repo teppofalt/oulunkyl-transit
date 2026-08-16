@@ -5,7 +5,7 @@ export const OULUNKYLA = {
   stationId: "HSL:1000210",
   /** Expected commuter train platform stops */
   trainStopIds: ["HSL:1285501", "HSL:1285551"],
-  /** Expected tram 15 stops */
+  /** Expected tram 15 stops (Oulunkylän keskusta) */
   tramStopIds: ["HSL:1284401", "HSL:1284402"],
   /** Name fragment used for lightweight identifier validation */
   nameFragment: "oulunkyl",
@@ -20,6 +20,16 @@ export const LATER_STEP_MINUTES = 60;
 /** Full timetable horizon (minutes) for "Näytä 24 h". */
 export const FULL_HORIZON_MINUTES = 24 * 60;
 
+/**
+ * HFP movement monitoring horizon (minutes). Only departures arriving within
+ * now → +this many minutes are monitored; never the whole board.
+ */
+export const HFP_MONITORING_HORIZON_MINUTES = 30;
+/** Maximum monitored trips, a hard safety cap on subscriptions. */
+export const HFP_MAX_MONITORED_TRIPS = 12;
+/** After this long without a matching vehicle message, report NO_MATCH. */
+export const HFP_NO_MATCH_AFTER_SECONDS = 120;
+
 /** Digitransit refresh interval while the page is visible (ms). */
 export const DEPARTURE_REFRESH_MS = 20_000;
 /** Minimum interval between manual refreshes (ms). */
@@ -31,7 +41,7 @@ export const PASSED_GRACE_SECONDS = 60;
 /** After this age, cached data is presented as possibly outdated (ms). */
 export const STALE_DATA_MS = 60_000;
 
-/** Stationary detector thresholds. */
+/** Stationary detector thresholds — keep easy to adjust. */
 export const STATIONARY = {
   /** Speed at or below this counts as not moving (m/s). */
   speedThresholdMps: 0.5,
@@ -49,14 +59,15 @@ export const STATIONARY = {
   staleAfterSeconds: 90,
   /** Gaps longer than this cannot be counted as confirmed stationary (s). */
   maxHistoryGapSeconds: 120,
-  /** Distance from the station within which a stop is "at station" (m). */
-  stationRadiusMeters: 180,
-  /** Required GPS accuracy-ish confidence: minimum observations to decide. */
-  minObservationsForLocation: 2,
+  /** Minimum samples required before asserting a stationary state. */
+  minConfirmSamples: 3,
+  /** Minimum time span those samples must cover (s). */
+  minConfirmSpanSeconds: 20,
+  /** Rolling in-memory observation history (s) — a few minutes only. */
+  historyRetentionSeconds: 600,
+  /** Hard cap on retained observations per vehicle. */
+  maxObservations: 300,
 } as const;
-
-/** Oulunkylä station coordinates (WGS84), used only for at-station vs on-track. */
-export const OULUNKYLA_COORDS = { lat: 60.2286, lon: 24.9682 } as const;
 
 /** HFP MQTT endpoint (public, no credentials). */
 export const HFP_BROKER_URL = "wss://mqtt.hsl.fi:443/";
