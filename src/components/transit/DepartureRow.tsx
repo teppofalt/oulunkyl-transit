@@ -9,7 +9,9 @@ import type { Departure } from "@/lib/transit/types";
  * NO_MATCH / AMBIGUOUS / STALE never show a guessed status.
  * Station-vs-track wording is intentionally not used in this phase.
  */
-function stationaryText(departure: Departure): { text: string; severity: "INFO" | "WARNING" } | null {
+function stationaryText(
+  departure: Departure,
+): { text: string; severity: "INFO" | "WARNING" } | null {
   const { movement } = departure;
   if (movement.matchStatus !== "MATCHED") return null;
   if (movement.movementStatus !== "STATIONARY") return null;
@@ -40,7 +42,10 @@ function DepartureRowBase({ departure, now }: Props) {
   if (delayed) notes.push({ text: `+${delayMinutes} min myöhässä`, tone: "warn" });
   if (early) notes.push({ text: `${delayMinutes} min etuajassa`, tone: "muted" });
   if (stationary) {
-    notes.push({ text: stationary.text, tone: stationary.severity === "WARNING" ? "warn" : "info" });
+    notes.push({
+      text: stationary.text,
+      tone: stationary.severity === "WARNING" ? "warn" : "info",
+    });
   }
   if (
     departure.movement.matchStatus === "MATCHED" &&
@@ -75,7 +80,11 @@ function DepartureRowBase({ departure, now }: Props) {
           <span className="notes">
             {notes.map((note, index) => (
               <span key={note.text} className={`note note-${note.tone}`}>
-                {index > 0 ? <span className="note-sep" aria-hidden="true">·</span> : null}
+                {index > 0 ? (
+                  <span className="note-sep" aria-hidden="true">
+                    ·
+                  </span>
+                ) : null}
                 {note.text}
               </span>
             ))}

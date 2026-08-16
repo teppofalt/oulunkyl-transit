@@ -12,12 +12,7 @@ export type MovementStatus = "UNKNOWN" | "MOVING" | "STATIONARY" | "STALE";
 export type StationarySeverity = "NONE" | "INFO" | "WARNING";
 
 /** HFP vehicle matching state — kept strictly separate from movement state. */
-export type HfpMatchStatus =
-  | "NOT_MONITORED"
-  | "SEARCHING"
-  | "MATCHED"
-  | "NO_MATCH"
-  | "AMBIGUOUS";
+export type HfpMatchStatus = "NOT_MONITORED" | "SEARCHING" | "MATCHED" | "NO_MATCH" | "AMBIGUOUS";
 
 export type MatchConfidence = "EXACT" | "NONE" | "AMBIGUOUS";
 

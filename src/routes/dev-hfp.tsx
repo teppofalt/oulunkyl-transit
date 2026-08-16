@@ -1,6 +1,9 @@
 /**
- * Development-only HFP diagnostics view. Not linked from the production UI and
- * renders nothing outside dev builds. Never prints any API key.
+ * Development-only HFP diagnostics view.
+ *
+ * Production safety: the route component never calls useBoard() outside dev, so
+ * navigating here in production starts no polling, no MQTT connection and no
+ * movement processing.
  */
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -23,7 +26,7 @@ export const Route = createFileRoute("/dev-hfp")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: DevHfpPage,
+  component: DevHfpRoute,
 });
 
 function clock(ms: number | null) {
@@ -31,9 +34,8 @@ function clock(ms: number | null) {
   return new Date(ms).toISOString().slice(11, 19);
 }
 
-function DevHfpPage() {
-  const board = useBoard();
-
+/** Gate: in production this renders a static page and mounts no board logic. */
+function DevHfpRoute() {
   if (!import.meta.env.DEV) {
     return (
       <main style={{ padding: "1rem" }}>
@@ -42,7 +44,11 @@ function DevHfpPage() {
       </main>
     );
   }
+  return <DevHfpContent />;
+}
 
+function DevHfpContent() {
+  const board = useBoard();
   const rows = board.hfpDiagnostics;
 
   return (
@@ -79,7 +85,10 @@ function DevHfpPage() {
                 "kesto s",
                 "stale",
               ].map((head) => (
-                <th key={head} style={{ borderBottom: "1px solid currentColor", textAlign: "left" }}>
+                <th
+                  key={head}
+                  style={{ borderBottom: "1px solid currentColor", textAlign: "left" }}
+                >
                   {head}
                 </th>
               ))}

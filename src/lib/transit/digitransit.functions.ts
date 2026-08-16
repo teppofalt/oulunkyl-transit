@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { OULUNKYLA } from "./config";
+import { evaluateIdentifiers, type ValidationInput } from "./identifierValidation";
 import type { BoardPayload, BoardSource } from "./types";
 
 const DIGITRANSIT_ENDPOINT = "https://api.digitransit.fi/routing/v2/hsl/gtfs/v1";
@@ -107,56 +108,41 @@ async function digitransitRequest<T>(
 let identifierCache: { checkedAt: number; valid: boolean; diagnostics: string[] } | null = null;
 const IDENTIFIER_CACHE_MS = 6 * 60 * 60 * 1000;
 
-type ValidationData = {
-  station: { gtfsId: string; name: string; stops: { gtfsId: string; name: string }[] } | null;
-  tramA: { gtfsId: string; name: string; routes: { shortName: string | null; mode: string | null }[] } | null;
-  tramB: { gtfsId: string; name: string; routes: { shortName: string | null; mode: string | null }[] } | null;
-};
-
 async function validateIdentifiers(): Promise<{ valid: boolean; diagnostics: string[] }> {
   if (identifierCache && Date.now() - identifierCache.checkedAt < IDENTIFIER_CACHE_MS) {
     return { valid: identifierCache.valid, diagnostics: identifierCache.diagnostics };
   }
-  const diagnostics: string[] = [];
-  let valid = true;
   try {
-    const result = await digitransitRequest<ValidationData>(VALIDATION_QUERY, {});
-    const data = result.data;
-    const fragment = OULUNKYLA.nameFragment;
-    const station = data?.station ?? null;
-    if (!station || !station.name.toLowerCase().includes(fragment)) {
-      valid = false;
-      diagnostics.push(`Asematunnus ${OULUNKYLA.stationId} ei vastaa Oulunkylää.`);
-    } else {
-      const stopIds = station.stops.map((s) => s.gtfsId);
-      for (const expected of OULUNKYLA.trainStopIds) {
-        if (!stopIds.includes(expected)) {
-          diagnostics.push(`Junapysäkki ${expected} ei kuulu asemaan ${station.gtfsId}.`);
-        }
-      }
-    }
-    for (const tram of [data?.tramA, data?.tramB]) {
-      if (!tram || !tram.name.toLowerCase().includes(fragment)) {
-        valid = false;
-        diagnostics.push("Raitiovaunupysäkin tunnus ei vastaa Oulunkylää.");
-        continue;
-      }
-      const has15 = tram.routes?.some((r) => r.shortName === "15");
-      if (!has15) diagnostics.push(`Pysäkillä ${tram.gtfsId} ei löytynyt linjaa 15.`);
-    }
+    const result = await digitransitRequest<ValidationInput>(VALIDATION_QUERY, {});
+    const outcome = evaluateIdentifiers(result.data ?? null);
+    identifierCache = { checkedAt: Date.now(), ...outcome };
+    return outcome;
   } catch (error) {
-    diagnostics.push(`Tunnusten tarkistus ei onnistunut: ${(error as Error).message}`);
-    // A failed validation must not block the board; treat as unverified.
-    return { valid: true, diagnostics };
+    // A failed validation request must not block the board; treat as unverified
+    // (not invalid) and do not cache the outcome.
+    return {
+      valid: true,
+      diagnostics: [`Tunnusten tarkistus ei onnistunut: ${(error as Error).message}`],
+    };
   }
-  identifierCache = { checkedAt: Date.now(), valid, diagnostics };
-  return { valid, diagnostics };
 }
 
 type BoardData = {
-  trains: { gtfsId: string; name: string; stoptimesWithoutPatterns: BoardSource["stoptimes"] } | null;
-  tramA: { gtfsId: string; name: string; stoptimesWithoutPatterns: BoardSource["stoptimes"] } | null;
-  tramB: { gtfsId: string; name: string; stoptimesWithoutPatterns: BoardSource["stoptimes"] } | null;
+  trains: {
+    gtfsId: string;
+    name: string;
+    stoptimesWithoutPatterns: BoardSource["stoptimes"];
+  } | null;
+  tramA: {
+    gtfsId: string;
+    name: string;
+    stoptimesWithoutPatterns: BoardSource["stoptimes"];
+  } | null;
+  tramB: {
+    gtfsId: string;
+    name: string;
+    stoptimesWithoutPatterns: BoardSource["stoptimes"];
+  } | null;
 };
 
 export const fetchBoard = createServerFn({ method: "GET" })

@@ -7,34 +7,46 @@ import {
   HFP_MAX_MONITORED_TRIPS,
   HFP_MONITORING_HORIZON_MINUTES,
   LIVE_HORIZON_MINUTES,
+  EXTENDED_HORIZON_MINUTES,
   FULL_HORIZON_MINUTES,
   PASSED_GRACE_SECONDS,
   STALE_DATA_MS,
+  UI_TICK_MS,
+  UI_TICK_EXTENDED_MS,
+  UI_TICK_DAY_MS,
 } from "./config";
 import { buildMonitoredTrip, type MonitoredTrip } from "./hfpService";
 import type { Departure, DirectionGroup } from "./types";
 
-/** LIVE = now → +60 min with realtime + HFP. DAY = 24 h timetable browser. */
-export type BoardMode = "LIVE" | "DAY";
+/**
+ * LIVE     = now → +60 min, realtime + HFP
+ * EXTENDED = now → +180 min ("Näytä myöhemmät"), refetched, HFP still ≤30 min
+ * DAY      = now → +24 h timetable browser, no HFP
+ */
+export type BoardMode = "LIVE" | "EXTENDED" | "DAY";
 
-export const DIRECTION_ORDER: DirectionGroup[] = [
-  "HELSINKI",
-  "NORTH",
-  "KEILANIEMI",
-  "ITAKESKUS",
-];
+export const DIRECTION_ORDER: DirectionGroup[] = ["HELSINKI", "NORTH", "KEILANIEMI", "ITAKESKUS"];
 
 export function horizonForMode(mode: BoardMode): number {
-  return mode === "DAY" ? FULL_HORIZON_MINUTES : LIVE_HORIZON_MINUTES;
+  if (mode === "DAY") return FULL_HORIZON_MINUTES;
+  if (mode === "EXTENDED") return EXTENDED_HORIZON_MINUTES;
+  return LIVE_HORIZON_MINUTES;
 }
 
-/** Rows shown per direction before "Näytä myöhemmät" is used. */
+/** UI tick interval per mode — long timetables do not need a 5 s clock. */
+export function uiTickForMode(mode: BoardMode): number {
+  if (mode === "DAY") return UI_TICK_DAY_MS;
+  if (mode === "EXTENDED") return UI_TICK_EXTENDED_MS;
+  return UI_TICK_MS;
+}
+
+/** Rows shown per direction before an extended mode is used. */
 export const BASE_ROWS_PER_DIRECTION = 3;
 /** Additional rows revealed per press. */
 export const ROWS_PER_STEP = 3;
 
 export function rowsPerDirection(mode: BoardMode, steps: number): number {
-  if (mode === "DAY") return Number.POSITIVE_INFINITY;
+  if (mode !== "LIVE") return Number.POSITIVE_INFINITY;
   return BASE_ROWS_PER_DIRECTION + steps * ROWS_PER_STEP;
 }
 
@@ -60,16 +72,17 @@ export function hasHiddenDepartures(
 /**
  * Trips eligible for HFP monitoring.
  *
- * Rules (battery/CPU): only in LIVE mode, only while the page is visible, only
- * inside the 30-minute monitoring horizon, never the 24 h dataset, and always
- * capped.
+ * Rules (battery/CPU): never in the 24 h timetable mode, only while the page is
+ * visible, only inside the 30-minute monitoring horizon — the 180-minute
+ * extended view does NOT widen it — and always capped.
  */
 export function selectMonitoredTrips(
   departures: Departure[],
   nowMs: number,
   opts: { mode: BoardMode; visible: boolean },
 ): MonitoredTrip[] {
-  if (opts.mode !== "LIVE" || !opts.visible) return [];
+  if (opts.mode === "DAY" || !opts.visible) return [];
+
   const limit = nowMs + HFP_MONITORING_HORIZON_MINUTES * 60_000;
   const floor = nowMs - PASSED_GRACE_SECONDS * 1000;
   return departures

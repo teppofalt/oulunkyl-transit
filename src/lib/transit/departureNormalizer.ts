@@ -104,7 +104,12 @@ export function normalizeBoard(
         (!existing.realtimeAvailable && departure.realtimeAvailable) ||
         (!existing.platformCode && departure.platformCode)
       ) {
-        byKey.set(key, existing ? { ...departure, platformCode: departure.platformCode ?? existing.platformCode } : departure);
+        byKey.set(
+          key,
+          existing
+            ? { ...departure, platformCode: departure.platformCode ?? existing.platformCode }
+            : departure,
+        );
       }
     }
   }

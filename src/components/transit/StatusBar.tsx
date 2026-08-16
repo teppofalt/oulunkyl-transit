@@ -6,18 +6,22 @@ type Props = {
   status: BoardStatus;
   now: number;
   mode: BoardMode;
-  moreAvailable: boolean;
   onRefresh: () => void;
   onLater: () => void;
   onFullDay: () => void;
   onBackToLive: () => void;
 };
 
+const MODE_NOTE: Record<BoardMode, string> = {
+  LIVE: "",
+  EXTENDED: " · aikataulunäkymä 3 h",
+  DAY: " · aikataulunäkymä 24 h",
+};
+
 export function StatusBar({
   status,
   now,
   mode,
-  moreAvailable,
   onRefresh,
   onLater,
   onFullDay,
@@ -29,6 +33,7 @@ export function StatusBar({
   return (
     <footer className="statusbar">
       {stale && status.lastSuccessAt !== null ? (
+        // Important state: announced once when it appears.
         <p className="stale-note" role="status">
           <strong>Tiedot eivät ehkä ole ajan tasalla</strong>
           <span>Viimeisin onnistunut päivitys {formatClock(status.lastSuccessAt)}</span>
@@ -38,28 +43,37 @@ export function StatusBar({
       <div className="controls">
         {mode === "LIVE" ? (
           <>
-            {moreAvailable ? (
-              <button type="button" className="ctrl" onClick={onLater}>
-                Näytä myöhemmät
-              </button>
-            ) : null}
+            <button type="button" className="ctrl" onClick={onLater}>
+              Näytä myöhemmät
+            </button>
             <button type="button" className="ctrl" onClick={onFullDay}>
               Näytä 24 h
             </button>
           </>
         ) : (
-          <button type="button" className="ctrl" onClick={onBackToLive}>
-            Takaisin live-näkymään
-          </button>
+          <>
+            <button type="button" className="ctrl" onClick={onBackToLive}>
+              Takaisin live-näkymään
+            </button>
+            {mode === "EXTENDED" ? (
+              <button type="button" className="ctrl" onClick={onFullDay}>
+                Näytä 24 h
+              </button>
+            ) : null}
+          </>
         )}
         <button type="button" className="ctrl ctrl-refresh" onClick={onRefresh}>
           Päivitä
         </button>
       </div>
 
-      <p className="status-line" aria-live="polite">
+      {/* Routine timestamp updates are not announced to screen readers. */}
+      <p className="status-line" aria-live="off">
         {status.lastSuccessAt ? (
-          <>Päivitetty {formatClockWithSeconds(status.lastSuccessAt)}</>
+          <>
+            Päivitetty {formatClockWithSeconds(status.lastSuccessAt)}
+            {status.refreshing ? " · päivitetään…" : ""}
+          </>
         ) : status.loading ? (
           "Haetaan lähtöjä…"
         ) : status.offline ? (
@@ -67,7 +81,7 @@ export function StatusBar({
         ) : (
           "Reaaliaikatieto ei saatavilla"
         )}
-        {mode === "DAY" ? " · aikataulunäkymä 24 h" : ""}
+        {MODE_NOTE[mode]}
       </p>
     </footer>
   );

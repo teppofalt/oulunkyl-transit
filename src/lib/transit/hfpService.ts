@@ -15,7 +15,7 @@
  *  - HFP is supplemental: nothing here may affect timetable / realtime ETA
  */
 
-import mqtt, { type MqttClient } from "mqtt";
+import { type MqttClient } from "mqtt";
 
 import { HFP_BROKER_URL, HFP_NO_MATCH_AFTER_SECONDS } from "./config";
 import { toHfpDirection } from "./hfpDirection";
@@ -62,7 +62,9 @@ export function hfpRouteId(routeGtfsId: string): string {
   return parts[parts.length - 1] ?? routeGtfsId;
 }
 
-export function topicFor(trip: Pick<MonitoredTrip, "mode" | "hfpRoute" | "hfpDirection" | "start">) {
+export function topicFor(
+  trip: Pick<MonitoredTrip, "mode" | "hfpRoute" | "hfpDirection" | "start">,
+) {
   // /hfp/v2/journey/ongoing/vp/<mode>/<oper>/<veh>/<route>/<dir>/<headsign>/<start>/#
   return `/hfp/v2/journey/ongoing/vp/${trip.mode}/+/+/${trip.hfpRoute}/${trip.hfpDirection}/+/${trip.start}/#`;
 }
@@ -115,7 +117,25 @@ export type HfpJourney = {
   observation: HfpObservation;
 };
 
-/** Parse a raw HFP vehicle-position payload into journey identity + observation. */
+/** Positive integer HFP identifier, or null when missing/invalid. */
+function numericId(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Parse a raw HFP vehicle-position payload into journey identity + observation.
+ *
+ * A payload without both a valid `oper` and a valid `veh` is rejected: the
+ * physical vehicle identity must be unambiguous, so "?/?"-style identities are
+ * never created and never locked to a trip.
+ */
 export function parseVehiclePosition(raw: string): HfpJourney | null {
   let payload: HfpPayload;
   try {
@@ -130,6 +150,10 @@ export function parseVehiclePosition(raw: string): HfpJourney | null {
   const ts = Date.parse(vp.tst);
   if (!Number.isFinite(ts)) return null;
 
+  const operatorId = numericId(vp.oper);
+  const vehicleNumber = numericId(vp.veh);
+  if (operatorId === null || vehicleNumber === null) return null;
+
   const locationSource = vp.loc ?? null;
   const trustCoordinates = locationSource === "GPS" || locationSource === null;
 
@@ -140,9 +164,9 @@ export function parseVehiclePosition(raw: string): HfpJourney | null {
     start: vp.start,
     observation: {
       timestamp: ts,
-      vehicleId: `${vp.oper ?? "?"}/${vp.veh ?? "?"}`,
-      operatorId: typeof vp.oper === "number" ? vp.oper : null,
-      vehicleNumber: typeof vp.veh === "number" ? vp.veh : null,
+      vehicleId: `${operatorId}/${vehicleNumber}`,
+      operatorId,
+      vehicleNumber,
       speedMps: typeof vp.spd === "number" ? vp.spd : null,
       lat: trustCoordinates && typeof vp.lat === "number" ? vp.lat : null,
       lon: trustCoordinates && typeof vp.long === "number" ? vp.long : null,
@@ -228,6 +252,8 @@ export type HfpMonitorOptions = {
  */
 export function createHfpMonitor(options: HfpMonitorOptions = {}) {
   let client: MqttClient | null = null;
+  /** True while the mqtt module is being dynamically imported. */
+  let clientLoading = false;
   /** topic -> number of trips needing it */
   const topicRefs = new Map<string, number>();
   const runtimes = new Map<string, TripRuntime>();
@@ -298,17 +324,46 @@ export function createHfpMonitor(options: HfpMonitorOptions = {}) {
     runtime.detector = addObservation(runtime.detector, sample, now);
   }
 
+  /**
+   * The MQTT client is loaded lazily: the ~75 kB gzip library is not part of the
+   * first paint, so the board renders before HFP is even needed. While it loads,
+   * `client` stays null; the "connect" handler subscribes every wanted topic, so
+   * nothing is lost.
+   */
   function ensureClient() {
-    if (client) return;
+    if (client || clientLoading) return;
     setStatus("connecting");
-    client =
-      options.connect?.(HFP_BROKER_URL) ??
-      mqtt.connect(HFP_BROKER_URL, {
-        protocolVersion: 5,
-        keepalive: 30,
-        reconnectPeriod: 5_000,
-        clean: true,
+    const injected = options.connect?.(HFP_BROKER_URL);
+    if (injected) {
+      client = injected;
+      attach();
+      return;
+    }
+    clientLoading = true;
+    void import("mqtt")
+      .then((mod) => {
+        clientLoading = false;
+        if (topicRefs.size === 0) {
+          // Everything was dropped while loading; do not open a connection.
+          setStatus("closed");
+          return;
+        }
+        client = mod.default.connect(HFP_BROKER_URL, {
+          protocolVersion: 5,
+          keepalive: 30,
+          reconnectPeriod: 5_000,
+          clean: true,
+        });
+        attach();
+      })
+      .catch(() => {
+        clientLoading = false;
+        setStatus("error");
       });
+  }
+
+  function attach() {
+    if (!client) return;
     client.on("connect", () => {
       setStatus("open");
       for (const topic of topicRefs.keys()) client?.subscribe(topic, { qos: 0 });
@@ -321,6 +376,7 @@ export function createHfpMonitor(options: HfpMonitorOptions = {}) {
   function teardown() {
     client?.end(true);
     client = null;
+    clientLoading = false;
     topicRefs.clear();
     setStatus("closed");
   }

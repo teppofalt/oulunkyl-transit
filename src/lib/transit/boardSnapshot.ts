@@ -36,10 +36,7 @@ function defaultStorage(): SnapshotStorage | null {
 }
 
 /** Serialize a snapshot, or null when it is not worth persisting. */
-export function serializeSnapshot(
-  payload: BoardPayload,
-  horizonMinutes: number,
-): string | null {
+export function serializeSnapshot(payload: BoardPayload, horizonMinutes: number): string | null {
   // The 24 h timetable is a browsing mode, not the launch screen; never cache it.
   if (horizonMinutes > 180) return null;
   const snapshot: BoardSnapshot = { version: 1, horizonMinutes, payload };

@@ -1,16 +1,57 @@
 /**
  * Timezone-safe time helpers.
  *
- * Digitransit returns `serviceDay` as an epoch-seconds timestamp for the start
- * of the service day, plus GTFS seconds offsets that may exceed 24 h. Adding
- * the two gives an absolute instant, so no naive local arithmetic is needed.
+ * Digitransit returns `serviceDay` as epoch seconds for the start of the service
+ * day plus GTFS seconds offsets that may exceed 24 h. Per the GTFS spec those
+ * offsets are counted from "noon minus 12 hours" of the service day, which keeps
+ * local clock times correct on the two daylight-saving transition days — plain
+ * epoch addition would be one hour off on exactly those days.
  */
 
 export const HELSINKI_TZ = "Europe/Helsinki";
 
+const partsFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: HELSINKI_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+/** Helsinki UTC offset (ms) in effect at a given instant. */
+function helsinkiOffsetMs(instant: number): number {
+  const parts = partsFormatter.formatToParts(new Date(instant));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second"),
+  );
+  return asUtc - Math.floor(instant / 1000) * 1000;
+}
+
+/** Epoch ms of local noon in Helsinki on the calendar date of `instant`. */
+function helsinkiNoonMs(instant: number): number {
+  const parts = partsFormatter.formatToParts(new Date(instant));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const naiveNoon = Date.UTC(get("year"), get("month") - 1, get("day"), 12, 0, 0);
+  // Two passes settle the offset even when the guess lands on the other side of
+  // a transition.
+  let noon = naiveNoon - helsinkiOffsetMs(naiveNoon);
+  noon = naiveNoon - helsinkiOffsetMs(noon);
+  return noon;
+}
+
 /** Absolute epoch ms for a GTFS (serviceDay, secondsFromMidnight) pair. */
 export function gtfsToEpochMs(serviceDay: number, secondsFromMidnight: number): number {
-  return (serviceDay + secondsFromMidnight) * 1000;
+  const anchor = helsinkiNoonMs(serviceDay * 1000) - 12 * 3600 * 1000;
+  return anchor + secondsFromMidnight * 1000;
 }
 
 const clockFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -87,7 +128,6 @@ export function distanceMeters(
   const dLon = toRad(b.lon - a.lon);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
