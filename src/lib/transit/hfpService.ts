@@ -115,7 +115,25 @@ export type HfpJourney = {
   observation: HfpObservation;
 };
 
-/** Parse a raw HFP vehicle-position payload into journey identity + observation. */
+/** Positive integer HFP identifier, or null when missing/invalid. */
+function numericId(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Parse a raw HFP vehicle-position payload into journey identity + observation.
+ *
+ * A payload without both a valid `oper` and a valid `veh` is rejected: the
+ * physical vehicle identity must be unambiguous, so "?/?"-style identities are
+ * never created and never locked to a trip.
+ */
 export function parseVehiclePosition(raw: string): HfpJourney | null {
   let payload: HfpPayload;
   try {
@@ -130,6 +148,10 @@ export function parseVehiclePosition(raw: string): HfpJourney | null {
   const ts = Date.parse(vp.tst);
   if (!Number.isFinite(ts)) return null;
 
+  const operatorId = numericId(vp.oper);
+  const vehicleNumber = numericId(vp.veh);
+  if (operatorId === null || vehicleNumber === null) return null;
+
   const locationSource = vp.loc ?? null;
   const trustCoordinates = locationSource === "GPS" || locationSource === null;
 
@@ -140,9 +162,9 @@ export function parseVehiclePosition(raw: string): HfpJourney | null {
     start: vp.start,
     observation: {
       timestamp: ts,
-      vehicleId: `${vp.oper ?? "?"}/${vp.veh ?? "?"}`,
-      operatorId: typeof vp.oper === "number" ? vp.oper : null,
-      vehicleNumber: typeof vp.veh === "number" ? vp.veh : null,
+      vehicleId: `${operatorId}/${vehicleNumber}`,
+      operatorId,
+      vehicleNumber,
       speedMps: typeof vp.spd === "number" ? vp.spd : null,
       lat: trustCoordinates && typeof vp.lat === "number" ? vp.lat : null,
       lon: trustCoordinates && typeof vp.long === "number" ? vp.long : null,
@@ -151,6 +173,7 @@ export function parseVehiclePosition(raw: string): HfpJourney | null {
     },
   };
 }
+
 
 function journeyMatches(trip: MonitoredTrip, journey: HfpJourney): boolean {
   return (
