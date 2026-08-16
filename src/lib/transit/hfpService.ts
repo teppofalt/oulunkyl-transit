@@ -15,7 +15,7 @@
  *  - HFP is supplemental: nothing here may affect timetable / realtime ETA
  */
 
-import mqtt, { type MqttClient } from "mqtt";
+import { type MqttClient } from "mqtt";
 
 import { HFP_BROKER_URL, HFP_NO_MATCH_AFTER_SECONDS } from "./config";
 import { toHfpDirection } from "./hfpDirection";
@@ -252,6 +252,8 @@ export type HfpMonitorOptions = {
  */
 export function createHfpMonitor(options: HfpMonitorOptions = {}) {
   let client: MqttClient | null = null;
+  /** True while the mqtt module is being dynamically imported. */
+  let clientLoading = false;
   /** topic -> number of trips needing it */
   const topicRefs = new Map<string, number>();
   const runtimes = new Map<string, TripRuntime>();
@@ -371,10 +373,10 @@ export function createHfpMonitor(options: HfpMonitorOptions = {}) {
     client.on("close", () => setStatus("closed"));
   }
 
-
   function teardown() {
     client?.end(true);
     client = null;
+    clientLoading = false;
     topicRefs.clear();
     setStatus("closed");
   }
