@@ -224,5 +224,7 @@ export function useBoard() {
     resetHorizon: () => setHorizonMinutes(LIVE_HORIZON_MINUTES),
     /** Development-only HFP diagnostics. */
     hfpDiagnostics,
+    /** Number of departures currently inside the HFP monitoring horizon. */
+    monitoredTripCount: monitoredTrips.length,
   };
 }
