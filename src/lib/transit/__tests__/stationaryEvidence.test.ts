@@ -103,9 +103,7 @@ describe("unobserved time never increases confirmed stationary duration", () => 
     const resumeAt = T0 + 200_000 + 10 * 60_000;
     state = feed(state, 40, slow, resumeAt);
     const info = evaluate(state, resumeAt + 40_000).info;
-    expect(info.stationarySeconds ?? 0).toBeLessThanOrEqual 
-      ? expect(info.stationarySeconds ?? 0).toBeLessThanOrEqual(60)
-      : undefined;
+    expect(info.stationarySeconds ?? 0).toBeLessThanOrEqual(60);
     expect(info.stationarySeverity).toBe("NONE");
   });
 });
