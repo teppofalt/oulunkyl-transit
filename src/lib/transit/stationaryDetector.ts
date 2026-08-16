@@ -146,7 +146,12 @@ export function evaluate(
     };
   }
 
-  const window = windowSamples(observations, nowMs - STATIONARY.observationWindowSeconds * 1000);
+  // Samples without speed AND without position carry no evidence (e.g. HFP
+  // messages positioned by odometer only) — never infer standing still from them.
+  const window = windowSamples(
+    observations,
+    nowMs - STATIONARY.observationWindowSeconds * 1000,
+  ).filter((o) => o.speed !== null || (o.lat !== null && o.lon !== null));
   const span = window.length >= 2 ? (window[window.length - 1]!.ts - window[0]!.ts) / 1000 : 0;
   const enoughEvidence =
     window.length >= STATIONARY.minConfirmSamples && span >= STATIONARY.minConfirmSpanSeconds;
