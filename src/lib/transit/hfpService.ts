@@ -322,17 +322,46 @@ export function createHfpMonitor(options: HfpMonitorOptions = {}) {
     runtime.detector = addObservation(runtime.detector, sample, now);
   }
 
+  /**
+   * The MQTT client is loaded lazily: the ~75 kB gzip library is not part of the
+   * first paint, so the board renders before HFP is even needed. While it loads,
+   * `client` stays null; the "connect" handler subscribes every wanted topic, so
+   * nothing is lost.
+   */
   function ensureClient() {
-    if (client) return;
+    if (client || clientLoading) return;
     setStatus("connecting");
-    client =
-      options.connect?.(HFP_BROKER_URL) ??
-      mqtt.connect(HFP_BROKER_URL, {
-        protocolVersion: 5,
-        keepalive: 30,
-        reconnectPeriod: 5_000,
-        clean: true,
+    const injected = options.connect?.(HFP_BROKER_URL);
+    if (injected) {
+      client = injected;
+      attach();
+      return;
+    }
+    clientLoading = true;
+    void import("mqtt")
+      .then((mod) => {
+        clientLoading = false;
+        if (topicRefs.size === 0) {
+          // Everything was dropped while loading; do not open a connection.
+          setStatus("closed");
+          return;
+        }
+        client = mod.default.connect(HFP_BROKER_URL, {
+          protocolVersion: 5,
+          keepalive: 30,
+          reconnectPeriod: 5_000,
+          clean: true,
+        });
+        attach();
+      })
+      .catch(() => {
+        clientLoading = false;
+        setStatus("error");
       });
+  }
+
+  function attach() {
+    if (!client) return;
     client.on("connect", () => {
       setStatus("open");
       for (const topic of topicRefs.keys()) client?.subscribe(topic, { qos: 0 });
@@ -341,6 +370,7 @@ export function createHfpMonitor(options: HfpMonitorOptions = {}) {
     client.on("error", () => setStatus("error"));
     client.on("close", () => setStatus("closed"));
   }
+
 
   function teardown() {
     client?.end(true);
