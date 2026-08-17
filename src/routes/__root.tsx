@@ -80,9 +80,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
-      { title: "Oulunkylä – junat ja ratikka 15" },
+      { title: "Oulunkylä – junat ja ratikka 15 nyt" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Oulunkylä – junat ja ratikka 15 nyt" },
+      { name: "twitter:title", content: "Oulunkylä – junat ja ratikka 15 nyt" },
+      { name: "description", content: "Oulunkylän lähtevät lähijunat ja pikaratikka 15 reaaliajassa: saapumisajat, myöhästymiset ja pysähtyneet vuorot yhdellä silmäyksellä." },
+      { property: "og:description", content: "Oulunkylän lähtevät lähijunat ja pikaratikka 15 reaaliajassa: saapumisajat, myöhästymiset ja pysähtyneet vuorot yhdellä silmäyksellä." },
+      { name: "twitter:description", content: "Oulunkylän lähtevät lähijunat ja pikaratikka 15 reaaliajassa: saapumisajat, myöhästymiset ja pysähtyneet vuorot yhdellä silmäyksellä." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f2257ec806a52925f0e970632ed78a25/id-preview-2ce8c9cc--6569a805-4b05-4795-97f4-a0783536db72.lovable.app-1786916363919.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f2257ec806a52925f0e970632ed78a25/id-preview-2ce8c9cc--6569a805-4b05-4795-97f4-a0783536db72.lovable.app-1786916363919.png" },
     ],
     links: [
       {
